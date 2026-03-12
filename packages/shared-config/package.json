@@ -50,6 +50,7 @@
     "build": "tsup src/index.ts src/env/index.ts src/env/api.ts src/env/worker.ts src/env/web.ts src/env/database.ts src/env/redis.ts src/env/s3.ts --format cjs,esm --dts --out-dir dist",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "eslint src/",
+    "test": "jest --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -57,7 +58,10 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0"
   }
