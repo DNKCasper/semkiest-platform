@@ -5,44 +5,44 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./env": {
+      "types": "./dist/env/index.d.ts",
       "import": "./dist/env/index.js",
-      "require": "./dist/env/index.js",
-      "types": "./dist/env/index.d.ts"
+      "require": "./dist/env/index.js"
     },
     "./env/api": {
+      "types": "./dist/env/api.d.ts",
       "import": "./dist/env/api.js",
-      "require": "./dist/env/api.js",
-      "types": "./dist/env/api.d.ts"
+      "require": "./dist/env/api.js"
     },
     "./env/worker": {
+      "types": "./dist/env/worker.d.ts",
       "import": "./dist/env/worker.js",
-      "require": "./dist/env/worker.js",
-      "types": "./dist/env/worker.d.ts"
+      "require": "./dist/env/worker.js"
     },
     "./env/web": {
+      "types": "./dist/env/web.d.ts",
       "import": "./dist/env/web.js",
-      "require": "./dist/env/web.js",
-      "types": "./dist/env/web.d.ts"
+      "require": "./dist/env/web.js"
     },
     "./env/database": {
+      "types": "./dist/env/database.d.ts",
       "import": "./dist/env/database.js",
-      "require": "./dist/env/database.js",
-      "types": "./dist/env/database.d.ts"
+      "require": "./dist/env/database.js"
     },
     "./env/redis": {
+      "types": "./dist/env/redis.d.ts",
       "import": "./dist/env/redis.js",
-      "require": "./dist/env/redis.js",
-      "types": "./dist/env/redis.d.ts"
+      "require": "./dist/env/redis.js"
     },
     "./env/s3": {
+      "types": "./dist/env/s3.d.ts",
       "import": "./dist/env/s3.js",
-      "require": "./dist/env/s3.js",
-      "types": "./dist/env/s3.d.ts"
+      "require": "./dist/env/s3.js"
     },
     "./tsconfig/*": "./tsconfig/*.json"
   },
