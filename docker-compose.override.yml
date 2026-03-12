@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  api:
+    volumes:
+      - ./apps/api/src:/app/src
+    environment:
+      NODE_ENV: development
+    command: npm run dev
+    ports:
+      - "9229:9229"
+
+  worker:
+    volumes:
+      - ./apps/worker/src:/app/src
+    command: npm run dev
+
+  web:
+    volumes:
+      - ./apps/web/src:/app/src
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+    command: npm run dev
