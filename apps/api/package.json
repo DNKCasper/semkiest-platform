@@ -1,0 +1,27 @@
+{
+  "name": "@semkiest/api",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src/ --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@semkiest/shared-types": "workspace:*",
+    "@semkiest/shared-utils": "workspace:*",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@semkiest/shared-config": "workspace:*",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
