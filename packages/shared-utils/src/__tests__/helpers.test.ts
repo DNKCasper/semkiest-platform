@@ -157,6 +157,17 @@ describe('deepMerge', () => {
     const result = deepMerge({ a: 1 }, { b: 2 }, { c: 3 });
     expect(result).toEqual({ a: 1, b: 2, c: 3 });
   });
+
+  it('skips non-plain-object sources', () => {
+    // Cast to bypass TypeScript to exercise the runtime guard
+    const result = deepMerge({ a: 1 }, null as unknown as Record<string, unknown>);
+    expect(result).toEqual({ a: 1 });
+  });
+
+  it('skips undefined values in source', () => {
+    const result = deepMerge({ a: 1, b: 2 }, { b: undefined });
+    expect(result).toEqual({ a: 1, b: 2 });
+  });
 });
 
 describe('sanitizeHtml', () => {

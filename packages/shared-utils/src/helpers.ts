@@ -68,7 +68,7 @@ function isPlainObject(value: unknown): value is PlainObject {
  * Arrays are replaced, not concatenated.
  * Returns a new object; does not mutate inputs.
  */
-export function deepMerge<T extends PlainObject>(target: T, ...sources: Partial<T>[]): T {
+export function deepMerge<T extends PlainObject>(target: T, ...sources: PlainObject[]): T {
   if (sources.length === 0) return target;
 
   const result = { ...target } as PlainObject;
