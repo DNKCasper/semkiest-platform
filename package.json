@@ -1,0 +1,25 @@
+{
+  "name": "semkiest-platform",
+  "version": "0.0.1",
+  "private": true,
+  "description": "SemkiEst Platform — modern collaborative application",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "pnpm --filter @semkiest/db prisma generate",
+    "db:migrate": "pnpm --filter @semkiest/db migrate:dev",
+    "db:seed": "pnpm --filter @semkiest/db seed",
+    "db:seed:dev": "pnpm --filter @semkiest/db seed:dev",
+    "db:seed:test": "pnpm --filter @semkiest/db seed:test"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}
