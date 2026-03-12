@@ -4,10 +4,14 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "paths": {
-      "@sem/shared": ["../../packages/shared/src/index.ts"],
-      "@sem/database": ["../../packages/database/src/index.ts"]
+      "@sem/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@sem/database": ["../../packages/database/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/database" }
+  ]
 }
