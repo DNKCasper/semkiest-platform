@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@semkiest/shared-config": "workspace:*",
+    "@types/node": "^20.0.0",
     "prisma": "^6.0.0",
     "typescript": "^5.6.0"
   }
