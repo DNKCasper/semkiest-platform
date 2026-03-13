@@ -1,0 +1,208 @@
+
+> @sem/storage@0.1.0 test
+> jest --passWithNoTests
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.641Z","level":"info","message":"Uploading screenshot","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/screenshot.png","size":15,"mimeType":"image/png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.651Z","level":"info","message":"Screenshot uploaded","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/screenshot.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.652Z","level":"info","message":"Uploading screenshot","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/mmoj5xwk-4hlwmz.png","size":15,"mimeType":"image/png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.653Z","level":"info","message":"Screenshot uploaded","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/mmoj5xwk-4hlwmz.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.654Z","level":"info","message":"Uploading baseline","context":"S3Provider","data":{"key":"proj-1/baselines/login-page.png","size":15,"mimeType":"image/png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.654Z","level":"info","message":"Baseline uploaded","context":"S3Provider","data":{"key":"proj-1/baselines/login-page.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.655Z","level":"info","message":"Uploading report","context":"S3Provider","data":{"key":"reports/run-1/html/report-mmoj5xwn-aocieo.html","format":"html","size":32}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.656Z","level":"info","message":"Report uploaded","context":"S3Provider","data":{"key":"reports/run-1/html/report-mmoj5xwn-aocieo.html"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.656Z","level":"info","message":"Uploading report","context":"S3Provider","data":{"key":"reports/run-1/json/report-mmoj5xwo-rekumm.json","format":"json","size":13}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.657Z","level":"info","message":"Report uploaded","context":"S3Provider","data":{"key":"reports/run-1/json/report-mmoj5xwo-rekumm.json"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.657Z","level":"info","message":"Generating presigned URL","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/file.png","expirationSeconds":3600}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.657Z","level":"info","message":"Presigned URL generated","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/file.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.657Z","level":"info","message":"Generating presigned URL","context":"S3Provider","data":{"key":"some/key","expirationSeconds":7200}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.658Z","level":"info","message":"Presigned URL generated","context":"S3Provider","data":{"key":"some/key"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.658Z","level":"info","message":"Deleting object","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/file.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.659Z","level":"info","message":"Object deleted","context":"S3Provider","data":{"key":"proj-1/run-1/result-1/screenshots/file.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.659Z","level":"info","message":"Listing objects","context":"S3Provider","data":{"prefix":"proj-1/run-1"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.659Z","level":"info","message":"Objects listed","context":"S3Provider","data":{"prefix":"proj-1/run-1","count":1}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.660Z","level":"info","message":"Uploading screenshot","context":"MinioProvider","data":{"key":"proj-2/run-2/result-2/screenshots/screenshot.png","size":15,"mimeType":"image/png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.660Z","level":"info","message":"Screenshot uploaded","context":"MinioProvider","data":{"key":"proj-2/run-2/result-2/screenshots/screenshot.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.661Z","level":"info","message":"Uploading baseline","context":"MinioProvider","data":{"key":"proj-2/baselines/home.png","size":15,"mimeType":"image/png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.661Z","level":"info","message":"Baseline uploaded","context":"MinioProvider","data":{"key":"proj-2/baselines/home.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.662Z","level":"info","message":"Uploading report","context":"MinioProvider","data":{"key":"reports/run-2/json/report-mmoj5xwu-wpka5j.json","format":"json","size":17}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.662Z","level":"info","message":"Report uploaded","context":"MinioProvider","data":{"key":"reports/run-2/json/report-mmoj5xwu-wpka5j.json"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.662Z","level":"info","message":"Generating presigned URL","context":"MinioProvider","data":{"key":"proj-2/baselines/home.png","expirationSeconds":3600}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.662Z","level":"info","message":"Presigned URL generated","context":"MinioProvider","data":{"key":"proj-2/baselines/home.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.663Z","level":"info","message":"Generating presigned URL","context":"MinioProvider","data":{"key":"some/key","expirationSeconds":900}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.663Z","level":"info","message":"Presigned URL generated","context":"MinioProvider","data":{"key":"some/key"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.663Z","level":"info","message":"Deleting object","context":"MinioProvider","data":{"key":"proj-2/baselines/home.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.663Z","level":"info","message":"Object deleted","context":"MinioProvider","data":{"key":"proj-2/baselines/home.png"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.664Z","level":"info","message":"Listing objects","context":"MinioProvider","data":{"prefix":"proj-2/baselines"}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+  console.log
+    {"timestamp":"2026-03-13T06:43:19.664Z","level":"info","message":"Objects listed","context":"MinioProvider","data":{"prefix":"proj-2/baselines","count":1}}
+
+      at StorageLogger.info (src/utils/logger.ts:47:13)
+
+PASS __tests__/storage.test.ts
+  S3Provider
+    uploadScreenshot
+      ✓ returns a storage key with correct path structure (11 ms)
+      ✓ generates a unique filename when originalName is not provided (1 ms)
+    uploadBaseline
+      ✓ returns a storage key with baseline path structure (1 ms)
+    uploadReport
+      ✓ accepts string content and returns key with report path (1 ms)
+      ✓ accepts Buffer content (1 ms)
+    getSignedUrl
+      ✓ returns a presigned URL string
+      ✓ accepts custom expiration seconds (1 ms)
+    deleteObject
+      ✓ completes without error (1 ms)
+    listObjects
+      ✓ returns array of storage objects (1 ms)
+  MinioProvider
+    uploadScreenshot
+      ✓ returns a storage key with correct path structure (1 ms)
+    uploadBaseline
+      ✓ returns baseline storage key (1 ms)
+    uploadReport
+      ✓ uploads string report content
+    getSignedUrl
+      ✓ returns a presigned URL (1 ms)
+      ✓ uses custom expiration when provided
+    deleteObject
+      ✓ completes without error
+    listObjects
+      ✓ returns array of storage objects from stream
+  createStorageProviderFromEnv
+    ✓ creates a provider from environment variables
+    ✓ throws when required environment variable is missing (4 ms)
+  createStorageProvider
+    ✓ creates an S3 provider when type is "s3"
+    ✓ creates a MinIO provider when type is "minio"
+    ✓ uses S3_PROVIDER env var when type is undefined
+
+Test Suites: 1 passed, 1 total
+Tests:       21 passed, 21 total
+Snapshots:   0 total
+Time:        0.77 s
+Ran all test suites.
