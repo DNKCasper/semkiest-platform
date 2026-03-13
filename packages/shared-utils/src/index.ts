@@ -4,6 +4,11 @@
  * Shared utility functions used across the SemkiEst platform.
  */
 
+export { createChildLogger, createCorrelatedLogger, logger } from './logger.js';
+export type { LogLevel } from './logger.js';
+export { retry } from './retry.js';
+export type { RetryOptions, RetryResult } from './retry.js';
+
 /** Returns true if the value is not null or undefined. */
 export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
