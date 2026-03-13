@@ -39,5 +39,5 @@
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
-  "name": "@sem/db"
+  "name": "@semkiest/db"
 }

@@ -13,6 +13,247 @@ generator client {
 }
 
 // =============================================================================
+// Core Domain Models (SEM-37: PostgreSQL Schema Design & Prisma ORM Setup)
+// =============================================================================
+
+/// Role a user holds within an organization.
+enum UserRole {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+/// Overall status of a test run execution.
+enum TestRunStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+/// Pass/fail outcome of a single named test within a run.
+enum TestResultStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  SKIPPED
+  ERROR
+}
+
+/// Pass/fail outcome of an individual step within a test result.
+enum TestStepStatus {
+  PENDING
+  PASSED
+  FAILED
+  SKIPPED
+}
+
+/// Top-level tenant grouping all users, projects, and billing data.
+model Organization {
+  id        String   @id @default(cuid())
+  /// Human-readable organization name.
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users         User[]
+  projects      Project[]
+  agentConfigs  AgentConfig[]
+  aiCreditUsage AiCreditUsage[]
+
+  @@map("organizations")
+}
+
+/// A member of an organization who can authenticate and interact with the platform.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  /// Foreign key to the owning organization.
+  orgId        String   @map("org_id")
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role         UserRole @default(VIEWER)
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  notifications Notification[]
+
+  @@index([orgId])
+  @@map("users")
+}
+
+/// A testing project scoped to an organization, containing test profiles and runs.
+model Project {
+  id          String   @id @default(cuid())
+  /// Foreign key to the owning organization.
+  orgId       String   @map("org_id")
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  testProfiles TestProfile[]
+  baselines    Baseline[]
+
+  @@index([orgId])
+  @@map("projects")
+}
+
+/// Configuration template (browser, viewport, base URL, etc.) used when triggering test runs.
+model TestProfile {
+  id        String   @id @default(cuid())
+  /// Foreign key to the owning project.
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  /// Arbitrary JSON configuration (browser engine, viewport, headless flag, etc.).
+  config    Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  testRuns TestRun[]
+
+  @@index([projectId])
+  @@map("test_profiles")
+}
+
+/// A single execution triggered from a test profile, aggregating multiple test results.
+model TestRun {
+  id            String        @id @default(cuid())
+  /// Foreign key to the test profile that was executed.
+  testProfileId String        @map("test_profile_id")
+  testProfile   TestProfile   @relation(fields: [testProfileId], references: [id], onDelete: Cascade)
+  status        TestRunStatus @default(PENDING)
+  startedAt     DateTime?     @map("started_at")
+  completedAt   DateTime?     @map("completed_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  testResults TestResult[]
+
+  @@index([testProfileId])
+  @@index([status])
+  @@map("test_runs")
+}
+
+/// The outcome of a single named test case within a run, with optional error detail.
+model TestResult {
+  id           String           @id @default(cuid())
+  /// Foreign key to the parent test run.
+  testRunId    String           @map("test_run_id")
+  testRun      TestRun          @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  testName     String           @map("test_name")
+  status       TestResultStatus @default(PENDING)
+  errorMessage String?          @map("error_message")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  testSteps TestStep[]
+
+  @@index([testRunId])
+  @@index([status])
+  @@map("test_results")
+}
+
+/// An individual action step within a test result, recording expected vs. actual output.
+model TestStep {
+  id           String       @id @default(cuid())
+  /// Foreign key to the parent test result.
+  testResultId String       @map("test_result_id")
+  testResult   TestResult   @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  stepNumber   Int          @map("step_number")
+  /// The action performed (e.g. "Navigate to /login").
+  action       String
+  /// What was expected to happen.
+  expected     String?
+  /// What actually happened.
+  actual       String?
+  status       TestStepStatus @default(PENDING)
+
+  screenshots Screenshot[]
+
+  @@index([testResultId])
+  @@map("test_steps")
+}
+
+/// A screenshot captured during a test step, stored in object storage.
+model Screenshot {
+  id         String   @id @default(cuid())
+  /// Foreign key to the test step that produced this screenshot.
+  testStepId String   @map("test_step_id")
+  testStep   TestStep @relation(fields: [testStepId], references: [id], onDelete: Cascade)
+  /// S3/MinIO object key for the image file.
+  s3Key      String   @map("s3_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([testStepId])
+  @@map("screenshots")
+}
+
+/// A reference screenshot used as the visual ground-truth for comparison runs.
+model Baseline {
+  id        String   @id @default(cuid())
+  /// Foreign key to the owning project.
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  /// S3/MinIO object key for the baseline image.
+  s3Key     String   @map("s3_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@map("baselines")
+}
+
+/// Per-organization AI agent configuration (model selection, concurrency, retry policy, etc.).
+model AgentConfig {
+  id         String       @id @default(cuid())
+  /// Foreign key to the owning organization.
+  orgId      String       @map("org_id")
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /// Arbitrary JSON payload for agent settings.
+  configJson Json         @default("{}") @map("config_json")
+  active     Boolean      @default(true)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  @@index([orgId])
+  @@map("agent_configs")
+}
+
+/// Ledger entry recording AI token/credit consumption by an organization.
+model AiCreditUsage {
+  id          String       @id @default(cuid())
+  /// Foreign key to the billed organization.
+  orgId       String       @map("org_id")
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  creditsUsed Int          @map("credits_used")
+  /// Human-readable description of why credits were consumed.
+  reason      String
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([orgId])
+  @@map("ai_credit_usage")
+}
+
+/// In-app notification delivered to a specific user.
+model Notification {
+  id        String   @id @default(cuid())
+  /// Foreign key to the recipient user.
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
+}
+
+// =============================================================================
 // Schedule Models (SEM-100: Cron-Based Scheduling Engine)
 // =============================================================================
 
