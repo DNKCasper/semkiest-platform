@@ -1,0 +1,26 @@
+{
+  "main": "./dist/index.js",
+  "scripts": {
+    "lint": "eslint src/",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts --format cjs --dts --out-dir dist",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "version": "0.0.0",
+  "types": "./dist/index.d.ts",
+  "name": "@semkiest/shared-types",
+  "exports": {
+    ".": {
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    }
+  },
+  "devDependencies": {
+    "@semkiest/shared-config": "workspace:*",
+    "typescript": "^5.4.0",
+    "tsup": "^8.0.0"
+  }
+}

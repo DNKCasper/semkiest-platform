@@ -1,28 +1,42 @@
 {
-  "name": "@sem/api",
-  "version": "1.0.0",
-  "private": true,
   "scripts": {
-    "build": "tsc",
-    "dev": "ts-node-dev --respawn src/index.ts",
-    "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn src/index.ts",
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest"
   },
+  "version": "1.0.0",
+  "private": true,
+  "name": "@sem/api",
+  "devDependencies": {
+    "@types/supertest": "^6.0.0",
+    "@types/node": "^20.0.0",
+    "supertest": "^7.0.0",
+    "@types/express": "^4.17.21",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "@types/jest": "^29.5.0",
+    "typescript": "^5.4.0",
+    "@types/bcryptjs": "^2.4.6",
+    "ts-node-dev": "^2.0.0",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/cors": "^2.8.17"
+  },
   "dependencies": {
-    "@sem/db": "*",
+    "@semkiest/shared-utils": "workspace:*",
+    "helmet": "^7.1.0",
     "bcryptjs": "^2.4.3",
     "express": "^4.19.0",
-    "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
-    "zod": "^3.23.0"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/node": "^20.0.0",
-    "typescript": "^5.4.0"
+    "zod": "^3.23.0",
+    "@semkiest/shared-config": "workspace:*",
+    "cors": "^2.8.5",
+    "@sem/db": "*",
+    "@semkiest/shared-types": "workspace:*",
+    "@semkiest/db": "workspace:*",
+    "rate-limiter-flexible": "^5.0.0",
+    "ioredis": "^5.3.2"
   }
 }

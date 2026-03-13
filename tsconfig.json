@@ -1,20 +1,32 @@
 {
+  "exclude": [
+    "node_modules"
+  ],
   "compilerOptions": {
+    "noUnusedLocals": true,
+    "resolveJsonModule": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
     "target": "ES2022",
     "module": "CommonJS",
-    "moduleResolution": "node",
-    "lib": ["ES2022"],
-    "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
-    "composite": true,
+    "inlineSources": false,
+    "preserveWatchOutput": true,
+    "lib": [
+      "ES2022"
+    ],
+    "strict": true,
+    "noImplicitReturns": true,
+    "declaration": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true
-  },
-  "exclude": ["node_modules"]
+    "moduleResolution": "node",
+    "isolatedModules": true,
+    "noImplicitAny": true,
+    "composite": true,
+    "skipLibCheck": true,
+    "noImplicitOverride": true,
+    "strictNullChecks": true,
+    "declarationMap": true
+  }
 }
