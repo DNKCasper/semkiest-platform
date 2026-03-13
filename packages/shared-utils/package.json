@@ -1,23 +1,35 @@
 {
-  "name": "@semkiest/shared-utils",
-  "version": "0.0.0",
   "main": "./dist/index.js",
+  "scripts": {
+    "lint": "eslint src/",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts --format cjs --dts --out-dir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "clean": "rm -rf dist coverage",
+    "test:watch": "vitest"
+  },
+  "version": "0.0.0",
   "types": "./dist/index.d.ts",
+  "name": "@semkiest/shared-utils",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
-  },
   "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@semkiest/shared-config": "workspace:*",
+    "typescript": "^5.4.0",
+    "vitest": "^1.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.4.0"
+    "@vitest/coverage-v8": "^1.0.0"
+  },
+  "dependencies": {
+    "pino": "^9.0.0",
+    "nanoid": "^3.3.7"
   }
 }

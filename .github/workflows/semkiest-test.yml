@@ -1,0 +1,159 @@
+# SemkiEst Reusable Test Workflow
+#
+# Client repositories can call this workflow from their own CI pipelines using
+# the `workflow_call` trigger. It triggers a SemkiEst test run against their
+# project and reports results back to the PR as a status check and comment.
+#
+# Usage example (in a client repo's .github/workflows/ci.yml):
+#
+#   jobs:
+#     semkiest:
+#       uses: your-org/semkiest-platform/.github/workflows/semkiest-test.yml@v1
+#       with:
+#         api-url: https://api.semkiest.io
+#         project-id: my-project-id
+#         test-profile: smoke          # optional
+#         pr-number: ${{ github.event.pull_request.number }}
+#       secrets:
+#         api-token: ${{ secrets.SEMKIEST_API_TOKEN }}
+#
+# Alternatively, reference the composite action directly for more control:
+#
+#   steps:
+#     - uses: your-org/semkiest-platform/.github/actions/semkiest-test@v1
+#       with:
+#         api-url: https://api.semkiest.io
+#         api-token: ${{ secrets.SEMKIEST_API_TOKEN }}
+#         project-id: my-project-id
+
+on:
+  workflow_call:
+    inputs:
+      api-url:
+        description: 'SemkiEst API base URL'
+        type: string
+        required: true
+
+      project-id:
+        description: 'SemkiEst project identifier'
+        type: string
+        required: true
+
+      test-profile:
+        description: 'Test profile to run (uses project default if omitted)'
+        type: string
+        required: false
+        default: ''
+
+      pr-number:
+        description: >
+          Pull Request number for posting the result comment.
+          Pass github.event.pull_request.number from the calling workflow.
+        type: number
+        required: false
+        default: 0
+
+      commit-sha:
+        description: 'Commit SHA for the status check (defaults to github.sha)'
+        type: string
+        required: false
+        default: ''
+
+      check-context:
+        description: 'GitHub status check context label'
+        type: string
+        required: false
+        default: 'semkiest/test-run'
+
+      poll-interval-seconds:
+        description: 'Polling interval in seconds'
+        type: number
+        required: false
+        default: 5
+
+      timeout-minutes:
+        description: 'Maximum wait time in minutes before failing the workflow'
+        type: number
+        required: false
+        default: 10
+
+    secrets:
+      api-token:
+        description: 'SemkiEst API authentication token'
+        required: true
+
+      github-token:
+        description: >
+          GitHub token for posting status checks and PR comments.
+          If omitted the default GITHUB_TOKEN from the calling repo is used.
+        required: false
+
+    outputs:
+      run-id:
+        description: 'SemkiEst test run ID'
+        value: ${{ jobs.semkiest-test.outputs.run-id }}
+
+      status:
+        description: 'Final test run status (passed | failed | cancelled | timeout)'
+        value: ${{ jobs.semkiest-test.outputs.status }}
+
+      report-url:
+        description: 'URL to the full test report'
+        value: ${{ jobs.semkiest-test.outputs.report-url }}
+
+      passed:
+        description: 'Number of passed tests'
+        value: ${{ jobs.semkiest-test.outputs.passed }}
+
+      failed:
+        description: 'Number of failed tests'
+        value: ${{ jobs.semkiest-test.outputs.failed }}
+
+      total:
+        description: 'Total number of tests'
+        value: ${{ jobs.semkiest-test.outputs.total }}
+
+jobs:
+  semkiest-test:
+    name: SemkiEst Test Run
+    runs-on: ubuntu-latest
+
+    outputs:
+      run-id: ${{ steps.run.outputs.run-id }}
+      status: ${{ steps.run.outputs.status }}
+      report-url: ${{ steps.run.outputs.report-url }}
+      passed: ${{ steps.run.outputs.passed }}
+      failed: ${{ steps.run.outputs.failed }}
+      total: ${{ steps.run.outputs.total }}
+
+    steps:
+      - name: Checkout SemkiEst action
+        uses: actions/checkout@v4
+        with:
+          # Check out the SemkiEst platform repo to access the composite action.
+          # When publishing to GitHub Marketplace this step is not needed — the
+          # action is resolved directly from the marketplace reference.
+          sparse-checkout: .github/actions/semkiest-test
+          sparse-checkout-cone-mode: false
+
+      - name: Run SemkiEst tests
+        id: run
+        uses: ./.github/actions/semkiest-test
+        with:
+          api-url: ${{ inputs.api-url }}
+          api-token: ${{ secrets.api-token }}
+          project-id: ${{ inputs.project-id }}
+          test-profile: ${{ inputs.test-profile }}
+          github-token: ${{ secrets.github-token || github.token }}
+          commit-sha: ${{ inputs.commit-sha || github.sha }}
+          pr-number: ${{ inputs.pr-number != 0 && inputs.pr-number || '' }}
+          check-context: ${{ inputs.check-context }}
+          poll-interval-seconds: ${{ inputs.poll-interval-seconds }}
+          timeout-minutes: ${{ inputs.timeout-minutes }}
+
+      - name: Fail workflow on test failure
+        if: steps.run.outputs.status != 'passed'
+        shell: bash
+        run: |
+          echo "::error::SemkiEst tests did not pass (status: ${{ steps.run.outputs.status }})"
+          exit 1

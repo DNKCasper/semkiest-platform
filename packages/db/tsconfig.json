@@ -1,9 +1,35 @@
 {
-  "extends": "../shared-config/tsconfig/node.json",
+  "include": [
+    "src/**/*.ts",
+    "src/**/*"
+  ],
+  "extends": "../../tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist",
+    "prisma",
+    "scripts"
+  ],
   "compilerOptions": {
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "lib": [
+      "ES2022"
+    ],
+    "moduleResolution": "node",
+    "rootDir": "./src",
+    "forceConsistentCasingInFileNames": true,
+    "target": "ES2022",
+    "strict": true,
+    "noImplicitReturns": true,
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "resolveJsonModule": true
+  }
 }
