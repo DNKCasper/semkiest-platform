@@ -1,46 +1,30 @@
-import express, { type Request, type Response, type NextFunction } from 'express';
-import reportsRouter from './routes/reports';
+import express from 'express';
+import { jiraRouter } from './routes/integrations/jira.js';
 
 const app = express();
 
-// ─── Middleware ────────────────────────────────────────────────────────────────
+// Parse JSON bodies; also expose raw body for webhook signature verification.
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as express.Request & { rawBody: Buffer }).rawBody = buf;
+    },
+  }),
+);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Routes
+app.use('/api/integrations/jira', jiraRouter);
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
-
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+// Basic health check
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
 });
 
-app.use('/api/v1/runs', reportsRouter);
+const port = process.env['PORT'] ?? 3001;
+const host = process.env['HOST'] ?? '0.0.0.0';
 
-// ─── 404 handler ──────────────────────────────────────────────────────────────
-
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: 'Not Found' });
-});
-
-// ─── Global error handler ─────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  const isDev = process.env['NODE_ENV'] !== 'production';
-  res.status(500).json({
-    error: 'Internal Server Error',
-    ...(isDev ? { message: err.message, stack: err.stack } : {}),
-  });
-});
-
-// ─── Server startup ───────────────────────────────────────────────────────────
-
-const PORT = Number(process.env['PORT'] ?? 3001);
-const HOST = process.env['HOST'] ?? '0.0.0.0';
-
-app.listen(PORT, HOST, () => {
-  // Using process.stdout to avoid linting warnings about console.log in production
-  process.stdout.write(`API server listening on http://${HOST}:${PORT}\n`);
+app.listen(Number(port), host, () => {
+  console.info(`API server listening on http://${host}:${port}`);
 });
 
 export default app;

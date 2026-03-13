@@ -1,1 +1,4 @@
-// Placeholder — types will be added in future stories
+// Shared TypeScript types for the SemkiEst platform.
+// Type definitions will be added here as the platform develops.
+
+export {};
