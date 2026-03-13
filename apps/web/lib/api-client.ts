@@ -6,6 +6,11 @@ import type {
   UpdateProjectInput,
   ApiError,
 } from '../types/project';
+import type {
+  TestRun,
+  RunListResponse,
+  RunQueryParams,
+} from '../types/run';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -92,6 +97,37 @@ export const projectsApi = {
   delete(id: string): Promise<void> {
     return request<void>(`/api/projects/${id}`, {
       method: 'DELETE',
+    });
+  },
+};
+
+/** Test run API methods */
+export const runsApi = {
+  /** GET /api/projects/:projectId/runs */
+  list(projectId: string, params: RunQueryParams = {}): Promise<RunListResponse> {
+    const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== '');
+    const qs = entries.length > 0
+      ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString()}`
+      : '';
+    return request<RunListResponse>(`/api/projects/${projectId}/runs${qs}`);
+  },
+
+  /** GET /api/projects/:projectId/runs/:runId */
+  get(projectId: string, runId: string): Promise<TestRun> {
+    return request<TestRun>(`/api/projects/${projectId}/runs/${runId}`);
+  },
+
+  /** POST /api/projects/:projectId/runs */
+  trigger(projectId: string): Promise<TestRun> {
+    return request<TestRun>(`/api/projects/${projectId}/runs`, {
+      method: 'POST',
+    });
+  },
+
+  /** POST /api/projects/:projectId/runs/:runId/cancel */
+  cancel(projectId: string, runId: string): Promise<TestRun> {
+    return request<TestRun>(`/api/projects/${projectId}/runs/${runId}/cancel`, {
+      method: 'POST',
     });
   },
 };
