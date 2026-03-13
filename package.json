@@ -1,24 +1,36 @@
 {
-  "name": "semkiest-platform",
-  "version": "1.0.0",
   "private": true,
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "typescript": "^5.7.3",
+    "husky": "^9.0.0",
+    "turbo": "^2.3.3",
+    "@commitlint/config-conventional": "^19.0.0"
+  },
+  "description": "SemkiEst Platform \u2014 modern collaborative application",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test"
-  },
-  "devDependencies": {
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.3"
-  },
+  "packageManager": "pnpm@9.0.0",
+  "version": "1.0.0",
   "engines": {
-    "node": ">=20.0.0",
-    "npm": ">=10.0.0"
-  }
+    "pnpm": ">=8.0.0",
+    "npm": ">=10.0.0",
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "db:generate": "pnpm --filter @semkiest/db prisma generate",
+    "db:seed:test": "pnpm --filter @semkiest/db seed:test",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "db:seed": "pnpm --filter @semkiest/db seed",
+    "db:seed:dev": "pnpm --filter @semkiest/db seed:dev",
+    "db:migrate": "pnpm --filter @semkiest/db migrate:dev",
+    "dev": "turbo run dev",
+    "clean": "turbo run clean",
+    "build": "turbo run build"
+  },
+  "name": "semkiest-platform"
 }
