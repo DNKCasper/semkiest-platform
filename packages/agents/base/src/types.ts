@@ -1,45 +1,45 @@
 /**
- * Core types for the BaseAgent framework.
+ * Agent lifecycle status.
  */
+export type AgentStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-/** Base configuration for all agents */
-export interface AgentConfig {
-  /** Unique identifier for this agent instance */
-  id: string;
-  /** Human-readable agent name */
-  name: string;
-  /** Maximum execution time in milliseconds (default: 60000) */
-  timeout?: number;
-}
-
-/** Structured result returned by every agent execution */
-export interface AgentResult<TData = unknown> {
-  /** Whether the execution completed successfully */
-  success: boolean;
-  /** Payload produced by the agent */
-  data?: TData;
-  /** Human-readable error message when success is false */
-  error?: string;
-  /** Wall-clock duration in milliseconds */
-  duration: number;
-  /** Arbitrary additional metadata */
-  metadata?: Record<string, unknown>;
-}
-
-/** Severity levels for agent log entries */
+/**
+ * Log level for agent output.
+ */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-/** A single structured log entry emitted during agent execution */
-export interface AgentLogEntry {
-  level: LogLevel;
-  message: string;
-  timestamp: Date;
-  context?: Record<string, unknown>;
+/**
+ * Configuration passed to BaseAgent constructor.
+ */
+export interface AgentConfig {
+  /** Human-readable name used in logs and results. */
+  name: string;
+  /** Minimum log level to emit. Defaults to 'info'. */
+  logLevel?: LogLevel;
 }
 
-/** Lifecycle events emitted by BaseAgent */
-export type AgentEvent =
-  | { type: 'start'; agentId: string; agentName: string }
-  | { type: 'end'; agentId: string; result: AgentResult }
-  | { type: 'log'; agentId: string; entry: AgentLogEntry }
-  | { type: 'error'; agentId: string; error: Error };
+/**
+ * Structured logger interface for agents.
+ */
+export interface AgentLogger {
+  debug(message: string, meta?: Record<string, unknown>): void;
+  info(message: string, meta?: Record<string, unknown>): void;
+  warn(message: string, meta?: Record<string, unknown>): void;
+  error(message: string, meta?: Record<string, unknown>): void;
+}
+
+/**
+ * Result returned by BaseAgent.run().
+ */
+export interface AgentResult<TOutput = unknown> {
+  /** Whether the agent completed without throwing. */
+  success: boolean;
+  /** Output produced by execute(), only present on success. */
+  data?: TOutput;
+  /** Error message, only present on failure. */
+  error?: string;
+  /** Wall-clock duration in milliseconds. */
+  duration: number;
+  /** Name of the agent that produced this result. */
+  agentName: string;
+}

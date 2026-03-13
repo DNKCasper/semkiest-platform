@@ -1,143 +1,128 @@
-import { EventEmitter } from 'events';
-import {
-  AgentConfig,
-  AgentResult,
-  AgentLogEntry,
-  AgentEvent,
-  LogLevel,
-} from './types';
+import type { AgentConfig, AgentLogger, AgentResult, AgentStatus, LogLevel } from './types.js';
+
+const LOG_LEVELS: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+};
 
 /**
- * Abstract base class that all SemkiEst agents extend.
- *
- * Provides:
- * - Lifecycle management (start → execute → end)
- * - Structured logging via `this.log()`
- * - Timeout enforcement
- * - EventEmitter-based event broadcasting
- * - Consistent AgentResult construction helpers
+ * Creates a structured console logger scoped to the agent name.
  */
-export abstract class BaseAgent<
-  TConfig extends AgentConfig = AgentConfig,
-  TInput = unknown,
-  TData = unknown,
-> extends EventEmitter {
-  protected readonly config: TConfig;
-  private readonly logs: AgentLogEntry[] = [];
+function createLogger(agentName: string, level: LogLevel): AgentLogger {
+  const minLevel = LOG_LEVELS[level];
 
-  constructor(config: TConfig) {
-    super();
-    this.config = config;
-  }
+  const emit = (lvl: LogLevel, fn: (s: string) => void, message: string, meta?: Record<string, unknown>): void => {
+    if (LOG_LEVELS[lvl] >= minLevel) {
+      const entry: Record<string, unknown> = {
+        timestamp: new Date().toISOString(),
+        level: lvl,
+        agent: agentName,
+        message,
+      };
+      if (meta !== undefined) {
+        entry['meta'] = meta;
+      }
+      fn(JSON.stringify(entry));
+    }
+  };
 
-  /** The agent's unique identifier */
-  get id(): string {
-    return this.config.id;
-  }
+  return {
+    debug: (msg, meta) => emit('debug', (s) => process.stdout.write(`${String(s)}\n`), msg, meta),
+    info: (msg, meta) => emit('info', (s) => process.stdout.write(`${String(s)}\n`), msg, meta),
+    warn: (msg, meta) => emit('warn', (s) => process.stderr.write(`${String(s)}\n`), msg, meta),
+    error: (msg, meta) => emit('error', (s) => process.stderr.write(`${String(s)}\n`), msg, meta),
+  };
+}
 
-  /** The agent's display name */
-  get name(): string {
-    return this.config.name;
+/**
+ * Abstract base class for all SemkiEst agents.
+ *
+ * Subclasses must implement `execute()`. The `run()` method orchestrates
+ * initialization, execution, and cleanup, returning a typed `AgentResult`.
+ *
+ * @example
+ * ```ts
+ * class MyAgent extends BaseAgent<MyInput, MyOutput> {
+ *   async execute(input: MyInput): Promise<MyOutput> {
+ *     // implementation
+ *   }
+ * }
+ * ```
+ */
+export abstract class BaseAgent<TInput = unknown, TOutput = unknown> {
+  protected readonly name: string;
+  protected readonly logger: AgentLogger;
+  private _status: AgentStatus = 'idle';
+
+  constructor(config: AgentConfig) {
+    this.name = config.name;
+    this.logger = createLogger(config.name, config.logLevel ?? 'info');
   }
 
   /**
-   * Override this method to implement agent-specific logic.
-   * Called internally by `run()` which wraps it with timeout and lifecycle events.
+   * Core agent logic implemented by subclasses.
+   * Called by `run()` after `initialize()` completes.
    */
-  protected abstract executeImpl(input: TInput): Promise<TData>;
+  abstract execute(input: TInput): Promise<TOutput>;
 
   /**
-   * Public entry-point. Wraps `executeImpl` with timeout, lifecycle events,
-   * and structured error handling.
+   * Orchestrates the full agent lifecycle: initialize → execute → cleanup.
+   * Always returns an `AgentResult`; never throws.
    */
-  async run(input: TInput): Promise<AgentResult<TData>> {
-    const startedAt = Date.now();
-
-    this.emitEvent({ type: 'start', agentId: this.id, agentName: this.name });
+  async run(input: TInput): Promise<AgentResult<TOutput>> {
+    const start = Date.now();
+    this._status = 'running';
+    this.logger.info('Agent starting');
 
     try {
-      const data = await this.withTimeout(
-        () => this.executeImpl(input),
-        this.config.timeout ?? 60_000,
-      );
-
-      const result: AgentResult<TData> = {
+      await this.initialize();
+      const data = await this.execute(input);
+      this._status = 'completed';
+      this.logger.info('Agent completed successfully');
+      return {
         success: true,
         data,
-        duration: Date.now() - startedAt,
-        metadata: { logs: this.logs },
+        duration: Date.now() - start,
+        agentName: this.name,
       };
-
-      this.emitEvent({ type: 'end', agentId: this.id, result });
-      return result;
     } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-
-      this.emitEvent({ type: 'error', agentId: this.id, error });
-
-      const result: AgentResult<TData> = {
+      this._status = 'failed';
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error('Agent execution failed', { error: message });
+      return {
         success: false,
-        error: error.message,
-        duration: Date.now() - startedAt,
-        metadata: { logs: this.logs },
+        error: message,
+        duration: Date.now() - start,
+        agentName: this.name,
       };
-
-      this.emitEvent({ type: 'end', agentId: this.id, result });
-      return result;
+    } finally {
+      await this.safeCleanup();
     }
   }
 
-  /** Emit a structured log entry and broadcast it as an agent event */
-  protected log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
-    const entry: AgentLogEntry = { level, message, timestamp: new Date(), context };
-    this.logs.push(entry);
-    this.emitEvent({ type: 'log', agentId: this.id, entry });
+  /** Override to run setup before execute(). */
+  protected async initialize(): Promise<void> {
+    this.logger.debug('Initializing agent');
   }
 
-  /** Convenience helpers */
-  protected debug(message: string, context?: Record<string, unknown>): void {
-    this.log('debug', message, context);
+  /** Override to run teardown after execute() (called in finally block). */
+  protected async cleanup(): Promise<void> {
+    this.logger.debug('Cleaning up agent');
   }
 
-  protected info(message: string, context?: Record<string, unknown>): void {
-    this.log('info', message, context);
+  /** Current lifecycle status of the agent. */
+  get status(): AgentStatus {
+    return this._status;
   }
 
-  protected warn(message: string, context?: Record<string, unknown>): void {
-    this.log('warn', message, context);
-  }
-
-  protected error(message: string, context?: Record<string, unknown>): void {
-    this.log('error', message, context);
-  }
-
-  /** Returns a copy of all log entries collected so far */
-  getLogs(): AgentLogEntry[] {
-    return [...this.logs];
-  }
-
-  // ─── Private helpers ──────────────────────────────────────────────────────
-
-  private emitEvent(event: AgentEvent): void {
-    this.emit(event.type, event);
-    this.emit('*', event);
-  }
-
-  private withTimeout<T>(fn: () => Promise<T>, ms: number): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error(`Agent "${this.name}" timed out after ${ms}ms`));
-      }, ms);
-
-      fn()
-        .then((value) => {
-          clearTimeout(timer);
-          resolve(value);
-        })
-        .catch((err: unknown) => {
-          clearTimeout(timer);
-          reject(err);
-        });
-    });
+  private async safeCleanup(): Promise<void> {
+    try {
+      await this.cleanup();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn('Cleanup failed', { error: message });
+    }
   }
 }
