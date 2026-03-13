@@ -1,5 +1,9 @@
 node_modules/
 dist/
-*.tsbuildinfo
-.env
-*.env.local
+build/
+.turbo/
+coverage/
+*.env
+.env.local
+.env.*.local
+prisma/migrations/

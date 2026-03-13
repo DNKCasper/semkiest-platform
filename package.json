@@ -2,15 +2,15 @@
   "scripts": {
     "lint": "turbo run lint",
     "db:seed": "pnpm --filter @semkiest/db seed",
-    "test": "turbo run test",
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "clean": "turbo run clean",
     "db:seed:dev": "pnpm --filter @semkiest/db seed:dev",
     "db:generate": "pnpm --filter @semkiest/db prisma generate",
     "db:seed:test": "pnpm --filter @semkiest/db seed:test",
+    "db:migrate": "pnpm --filter @semkiest/db migrate:dev",
     "typecheck": "turbo run typecheck",
-    "db:migrate": "pnpm --filter @semkiest/db migrate:dev"
+    "test": "turbo run test",
+    "clean": "turbo run clean"
   },
   "version": "1.0.0",
   "private": true,
@@ -18,11 +18,12 @@
   "name": "semkiest-platform",
   "engines": {
     "pnpm": ">=8.0.0",
-    "node": ">=20.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=10.0.0"
   },
   "devDependencies": {
-    "turbo": "^2.3.0",
-    "typescript": "^5.4.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.5.0",
     "@commitlint/config-conventional": "^19.0.0",
     "husky": "^9.0.0",
     "@commitlint/cli": "^19.0.0"
