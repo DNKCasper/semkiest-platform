@@ -1,0 +1,245 @@
+name: Deploy to Production
+
+on:
+  # Manual trigger — requires specifying the image tag to deploy
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (short SHA, e.g. "a1b2c3d4")'
+        required: true
+        type: string
+      services:
+        description: 'Services to deploy (comma-separated: api,web,worker or "all")'
+        required: false
+        default: 'all'
+        type: string
+      skip_migrations:
+        description: 'Skip database migrations (use with caution)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER_PRODUCTION || 'semkiest-production' }}
+  ENVIRONMENT: production
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Verify the requested image tag exists in ECR before proceeding
+  # ─────────────────────────────────────────────────────────────────────────────
+  verify-image:
+    name: Verify Image Exists in ECR
+    runs-on: ubuntu-latest
+    # Production deployments require the "production" environment — configure
+    # required reviewers in the GitHub environment settings to enforce approval.
+    environment: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      image-tag: ${{ steps.validate.outputs.image-tag }}
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate image tag exists for all services
+        id: validate
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag }}"
+          echo "Validating image tag: ${IMAGE_TAG}"
+
+          for service in api web worker; do
+            echo "Checking ECR for semkiest/${service}:${IMAGE_TAG}..."
+            aws ecr describe-images \
+              --repository-name "semkiest/${service}" \
+              --image-ids "imageTag=${IMAGE_TAG}" \
+              --region "${{ env.AWS_REGION }}" \
+              || { echo "❌ Image semkiest/${service}:${IMAGE_TAG} not found in ECR"; exit 1; }
+            echo "✅ semkiest/${service}:${IMAGE_TAG} verified"
+          done
+
+          echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Run database migrations before deploying new application code
+  # ─────────────────────────────────────────────────────────────────────────────
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: verify-image
+    if: inputs.skip_migrations != 'true'
+    environment: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run database migrations
+        run: |
+          chmod +x scripts/migrate.sh
+          ./scripts/migrate.sh
+        env:
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          ECS_CLUSTER: ${{ env.ECS_CLUSTER }}
+          ECS_MIGRATION_TASK_DEFINITION: ${{ vars.ECS_MIGRATION_TASK_DEF_PRODUCTION }}
+          ECS_MIGRATION_SUBNET: ${{ secrets.ECS_MIGRATION_SUBNET_PRODUCTION }}
+          ECS_MIGRATION_SECURITY_GROUP: ${{ secrets.ECS_MIGRATION_SG_PRODUCTION }}
+          IMAGE_TAG: ${{ needs.verify-image.outputs.image-tag }}
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Deploy to production — blue/green via ECS rolling update with rollback
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy ${{ matrix.service.name }} to Production
+    runs-on: ubuntu-latest
+    needs:
+      - verify-image
+      - migrate
+    if: always() && needs.verify-image.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
+    environment: production
+
+    permissions:
+      id-token: write
+      contents: read
+      deployments: write
+
+    strategy:
+      # Serial production deployments to reduce blast radius
+      max-parallel: 1
+      matrix:
+        service:
+          - name: api
+            ecs_service: ${{ vars.ECS_SERVICE_API_PRODUCTION || 'semkiest-production-api' }}
+            task_def_family: ${{ vars.ECS_TASK_DEF_API_PRODUCTION || 'semkiest-production-api' }}
+            container_name: api
+            health_path: /health
+            port: 3001
+          - name: web
+            ecs_service: ${{ vars.ECS_SERVICE_WEB_PRODUCTION || 'semkiest-production-web' }}
+            task_def_family: ${{ vars.ECS_TASK_DEF_WEB_PRODUCTION || 'semkiest-production-web' }}
+            container_name: web
+            health_path: /api/health
+            port: 3000
+          - name: worker
+            ecs_service: ${{ vars.ECS_SERVICE_WORKER_PRODUCTION || 'semkiest-production-worker' }}
+            task_def_family: ${{ vars.ECS_TASK_DEF_WORKER_PRODUCTION || 'semkiest-production-worker' }}
+            container_name: worker
+            health_path: ''
+            port: ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Skip service if not in requested list
+        id: check-service
+        run: |
+          SERVICES="${{ inputs.services }}"
+          SERVICE="${{ matrix.service.name }}"
+
+          if [[ "$SERVICES" == "all" ]] || echo "$SERVICES" | grep -qw "$SERVICE"; then
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "deploy=false" >> $GITHUB_OUTPUT
+            echo "Skipping $SERVICE — not in requested services list: $SERVICES"
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        if: steps.check-service.outputs.deploy == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy ${{ matrix.service.name }} service
+        if: steps.check-service.outputs.deploy == 'true'
+        id: deploy
+        run: |
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh
+        env:
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          ECS_CLUSTER: ${{ env.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ matrix.service.ecs_service }}
+          TASK_DEF_FAMILY: ${{ matrix.service.task_def_family }}
+          CONTAINER_NAME: ${{ matrix.service.container_name }}
+          IMAGE_URI: ${{ env.ECR_REGISTRY }}/semkiest/${{ matrix.service.name }}:${{ needs.verify-image.outputs.image-tag }}
+          HEALTH_CHECK_PATH: ${{ matrix.service.health_path }}
+          HEALTH_CHECK_PORT: ${{ matrix.service.port }}
+          LOAD_BALANCER_URL: ${{ secrets.PRODUCTION_LB_URL }}
+          SECRETS_MANAGER_PREFIX: semkiest/production
+          AWS_REGION: ${{ env.AWS_REGION }}
+          DEPLOY_TIMEOUT: '600'
+          HEALTH_CHECK_RETRIES: '20'
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Record deployment history as a GitHub deployment event
+  # ─────────────────────────────────────────────────────────────────────────────
+  record-deployment:
+    name: Record Deployment
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+
+    permissions:
+      deployments: write
+      contents: read
+
+    steps:
+      - name: Create GitHub Deployment record
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ needs.deploy.result }}' === 'success' ? 'success' : 'failure';
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'production',
+              description: `Production deployment of image tag: ${{ inputs.image_tag }}`,
+              auto_merge: false,
+              required_contexts: [],
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: status,
+              description: status === 'success'
+                ? `Successfully deployed ${{ inputs.image_tag }} to production`
+                : `Production deployment of ${{ inputs.image_tag }} FAILED`,
+            });
+
+            console.log(`Deployment recorded with status: ${status}`);
+
+      - name: Announce deployment outcome
+        run: |
+          if [[ "${{ needs.deploy.result }}" == "success" ]]; then
+            echo "✅ Production deployment of ${{ inputs.image_tag }} completed successfully"
+          else
+            echo "❌ Production deployment of ${{ inputs.image_tag }} FAILED"
+            exit 1
+          fi
