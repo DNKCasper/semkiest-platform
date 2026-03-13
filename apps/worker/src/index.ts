@@ -1,33 +1,50 @@
-import Redis from 'ioredis';
-import {
-  createDailyAggregationWorker,
-  registerDailyAggregationSchedule,
-} from './jobs/daily-aggregation';
+import { Redis } from 'ioredis';
+import { parseWorkerEnv, parseRedisEnv } from '@semkiest/shared-config';
+import { createSchedulerWorker } from './workers/scheduler.worker';
 
-const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
+// ---------------------------------------------------------------------------
+// Environment validation
+// ---------------------------------------------------------------------------
+const workerEnv = parseWorkerEnv();
+const redisEnv = parseRedisEnv();
 
-async function main(): Promise<void> {
-  const connection = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
+// ---------------------------------------------------------------------------
+// Redis connection
+// ---------------------------------------------------------------------------
+const redis = new Redis(redisEnv.REDIS_URL, {
+  maxRetriesPerRequest: null,
+  keyPrefix: redisEnv.REDIS_KEY_PREFIX,
+  retryStrategy: (times) => Math.min(times * 200, 5000),
+});
 
-  // Register repeatable schedule
-  await registerDailyAggregationSchedule(connection);
+redis.on('connect', () => console.info('[worker] Redis connected'));
+redis.on('error', (err) => console.error('[worker] Redis error:', err));
 
-  const concurrency = Number(process.env['WORKER_CONCURRENCY'] ?? 1);
-  const worker = createDailyAggregationWorker(connection, concurrency);
+// ---------------------------------------------------------------------------
+// Start workers
+// ---------------------------------------------------------------------------
+const concurrency = workerEnv.WORKER_CONCURRENCY;
 
-  console.info('[worker] Daily aggregation worker started.');
+const schedulerWorker = createSchedulerWorker(
+  redis as unknown as Parameters<typeof createSchedulerWorker>[0],
+  concurrency,
+);
 
-  const shutdown = async (): Promise<void> => {
-    console.info('[worker] Shutting down...');
-    await worker.close();
-    connection.disconnect();
-  };
+console.info(`[worker] Scheduler worker started (concurrency=${concurrency})`);
 
-  process.on('SIGTERM', () => void shutdown());
-  process.on('SIGINT', () => void shutdown());
+// ---------------------------------------------------------------------------
+// Graceful shutdown
+// ---------------------------------------------------------------------------
+async function shutdown(signal: string): Promise<void> {
+  console.info(`[worker] Received ${signal}, shutting down…`);
+  await schedulerWorker.close();
+  await redis.quit();
+  process.exit(0);
 }
 
-main().catch((err: unknown) => {
-  console.error('[worker] Fatal error:', err);
-  process.exit(1);
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('uncaughtException', (err) => {
+  console.error('[worker] Uncaught exception:', err);
+  shutdown('uncaughtException').catch(() => process.exit(1));
 });

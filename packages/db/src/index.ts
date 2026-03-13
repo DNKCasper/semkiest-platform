@@ -1,22 +1,26 @@
 import { PrismaClient } from '@prisma/client';
 
-// Singleton pattern: reuse connection in dev (prevents hot-reload exhaustion)
-declare global {
-  // eslint-disable-next-line no-var
-  var __prisma: PrismaClient | undefined;
-}
+/** Singleton PrismaClient instance shared across the process. */
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-export const prisma =
-  global.__prisma ??
+export const prisma: PrismaClient =
+  globalForPrisma.prisma ??
   new PrismaClient({
     log:
       process.env['NODE_ENV'] === 'development'
-        ? ['query', 'warn', 'error']
-        : ['warn', 'error'],
+        ? ['query', 'error', 'warn']
+        : ['error'],
   });
 
 if (process.env['NODE_ENV'] !== 'production') {
-  global.__prisma = prisma;
+  globalForPrisma.prisma = prisma;
 }
 
-export type { Prisma, Organization, ScoringConfig, Project, QualityScore } from '@prisma/client';
+export default prisma;
+
+// Re-export Prisma types for convenience
+export { Prisma, ScheduleStatus, RunStatus } from '@prisma/client';
+export type {
+  Schedule,
+  ScheduleRun,
+} from '@prisma/client';

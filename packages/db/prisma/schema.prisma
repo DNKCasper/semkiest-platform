@@ -1,9 +1,6 @@
-// Prisma schema for SemkiEst Platform
-// Database: PostgreSQL
-
-generator client {
-  provider = "prisma-client-js"
-}
+// =============================================================================
+// SemkiEst Platform – Prisma Database Schema
+// =============================================================================
 
 datasource db {
   provider  = "postgresql"
@@ -11,87 +8,91 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── Organization ────────────────────────────────────────────────────────────
-
-model Organization {
-  id            String         @id @default(uuid())
-  name          String         @unique
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  scoringConfig ScoringConfig?
-  projects      Project[]
-
-  @@map("organizations")
+generator client {
+  provider = "prisma-client-js"
 }
 
-// ─── Scoring Configuration ────────────────────────────────────────────────────
+// =============================================================================
+// Schedule Models (SEM-100: Cron-Based Scheduling Engine)
+// =============================================================================
 
-/// Per-organization scoring weight configuration.
-/// Weights must sum to 1.0. Default weights are applied when not customized.
-model ScoringConfig {
-  id                  String       @id @default(uuid())
-  organizationId      String       @unique
-  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  // Scoring weights (must sum to 1.0)
-  functionalWeight    Float        @default(0.30)
-  visualWeight        Float        @default(0.20)
-  performanceWeight   Float        @default(0.20)
-  accessibilityWeight Float        @default(0.10)
-  securityWeight      Float        @default(0.10)
-  apiWeight           Float        @default(0.10)
-
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-
-  @@map("scoring_configs")
+/// Current operational status of a schedule.
+enum ScheduleStatus {
+  ACTIVE
+  PAUSED
+  DELETED
 }
 
-// ─── Project ──────────────────────────────────────────────────────────────────
+/// Outcome status of a single scheduled test run.
+enum RunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
 
-model Project {
-  id             String         @id @default(uuid())
+/// A cron-based schedule that triggers automated test runs for a project.
+model Schedule {
+  id             String         @id @default(cuid())
+  /// Human-readable label for the schedule.
   name           String
-  team           String?
-  organizationId String
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Optional description of what this schedule tests.
+  description    String?
+  /// Standard 5-field cron expression (e.g. "0 9 * * 1").
+  cronExpression String
+  /// IANA timezone identifier (e.g. "America/New_York"). Defaults to UTC.
+  timezone       String         @default("UTC")
+  /// The project this schedule belongs to.
+  projectId      String
+  /// Operational status of the schedule.
+  status         ScheduleStatus @default(ACTIVE)
+  /// Calculated timestamp of the next scheduled execution.
+  nextRunAt      DateTime?
+  /// Timestamp of the most recent execution attempt.
+  lastRunAt      DateTime?
+  /// Status outcome of the most recent execution.
+  lastRunStatus  RunStatus?
+  /// Count of missed schedule windows (incremented when a run is skipped).
+  missedRuns     Int            @default(0)
+  /// Number of retry attempts for failed runs.
+  retryAttempts  Int            @default(3)
+  /// Base delay (ms) between retries; used with exponential backoff.
+  retryDelay     Int            @default(5000)
+  /// Whether to emit notifications for execution events.
+  notifications  Boolean        @default(false)
+  /// Arbitrary JSON metadata for extensibility.
+  metadata       Json?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  qualityScores  QualityScore[]
 
-  @@map("projects")
+  runs ScheduleRun[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([nextRunAt])
 }
 
-// ─── Quality Score ────────────────────────────────────────────────────────────
+/// A single execution record for a Schedule.
+model ScheduleRun {
+  id           String    @id @default(cuid())
+  scheduleId   String
+  schedule     Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  /// Execution outcome.
+  status       RunStatus
+  /// When the run was initiated.
+  startedAt    DateTime  @default(now())
+  /// When the run finished (success or failure).
+  completedAt  DateTime?
+  /// Error details if the run failed.
+  errorMessage String?
+  /// BullMQ job ID that corresponds to this run.
+  jobId        String?
+  /// Attempt number within the retry sequence (1 = first attempt).
+  attempt      Int       @default(1)
+  createdAt    DateTime  @default(now())
 
-/// Immutable snapshot of a project's quality score at a point in time.
-/// Used for trend calculation and historical analysis.
-model QualityScore {
-  id                    String   @id @default(uuid())
-  projectId             String
-  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  /// Composite weighted score (0–100)
-  score                 Float
-
-  /// Pass rates per category (null means category not tested)
-  functionalPassRate    Float?
-  visualPassRate        Float?
-  performancePassRate   Float?
-  accessibilityPassRate Float?
-  securityPassRate      Float?
-  apiPassRate           Float?
-
-  /// Badge assigned based on score threshold
-  badge                 String   // excellent | good | needs_attention | critical
-
-  /// Score trend compared to previous snapshot
-  trend                 String   // improving | declining | stable
-
-  /// Point-in-time when the score was calculated
-  calculatedAt          DateTime @default(now())
-  createdAt             DateTime @default(now())
-
-  @@index([projectId, calculatedAt(sort: Desc)])
-  @@map("quality_scores")
+  @@index([scheduleId])
+  @@index([status])
+  @@index([startedAt])
 }
