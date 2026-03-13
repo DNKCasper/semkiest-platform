@@ -1,12 +1,21 @@
 {
-  "extends": "../../shared-config/tsconfig/base.json",
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
+  "extends": "../../../packages/shared-config/tsconfig/node.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ES2022"],
+    "rootDir": "./src",
     "outDir": "./dist",
-    "rootDir": "./src"
+    "lib": [
+      "ES2022"
+    ],
+    "baseUrl": "."
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "src/**/*.ts"
+  ]
 }

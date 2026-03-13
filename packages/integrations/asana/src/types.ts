@@ -1,141 +1,181 @@
 /**
- * Severity levels used across SemkiEst for categorizing test failures.
+ * Core Asana domain types used across the integration package.
  */
-export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
-/**
- * A file attachment (screenshot or artifact) to be uploaded to an Asana task.
- */
-export interface Attachment {
-  /** Display name for the attachment */
-  name: string;
-  /** Raw file data */
-  data: Buffer;
-  /** MIME type (e.g. "image/png", "application/json") */
-  mimeType: string;
-}
-
-/**
- * Represents a failed test result from which a bug task is created.
- */
-export interface FailedTestResult {
-  /** Name of the individual test case */
-  testName: string;
-  /** Name of the test suite / describe block */
-  suiteName: string;
-  /** Primary error message from the failure */
-  errorMessage: string;
-  /** Optional full stack trace */
-  stackTrace?: string;
-  /** Severity level of this failure */
-  severity: Severity;
-  /** Screenshots captured during the test run */
-  screenshots?: Attachment[];
-  /** Additional artifacts (logs, HAR files, etc.) */
-  artifacts?: Attachment[];
-  /** Unique identifier for the test run that produced this failure */
-  testRunId: string;
-  /** Optional Asana GID of the user to assign this task to */
-  assigneeGid?: string;
-  /** When the failure occurred */
-  timestamp: Date;
-}
-
-/**
- * Configuration for the BugReporter.
- * Provide either `accessToken` (plaintext) or `encryptedToken` + `encryptionKey`.
- */
-export interface BugReporterConfig {
-  /** Plaintext Asana personal access token (use only in development / tests) */
-  accessToken?: string;
-  /** AES-256-GCM encrypted Asana personal access token */
-  encryptedToken?: string;
-  /** Key used to decrypt `encryptedToken` */
-  encryptionKey?: string;
-  /** Asana workspace GID */
-  workspaceGid: string;
-  /** Asana project GID where bug tasks are created */
-  projectGid: string;
-  /** Optional Asana section GID within the project */
-  sectionGid?: string;
-  /** Default assignee GID (can be overridden per test result) */
-  assigneeGid?: string;
-}
-
-// ─── Asana REST API response shapes ────────────────────────────────────────
-
-/** Minimal resource reference returned by many Asana endpoints */
-export interface AsanaRef {
+export interface AsanaUser {
   gid: string;
-  resource_type: string;
+  name: string;
+  email: string;
+}
+
+export interface AsanaProject {
+  gid: string;
+  name: string;
+}
+
+export interface AsanaSection {
+  gid: string;
+  name: string;
+}
+
+export interface AsanaMembership {
+  project: AsanaProject;
+  section: AsanaSection | null;
+}
+
+export interface AsanaEnumValue {
+  gid: string;
+  name: string;
+  color: string;
+}
+
+export interface AsanaCustomField {
+  gid: string;
+  name: string;
+  type: string;
+  enum_value: AsanaEnumValue | null;
+  text_value: string | null;
+  number_value: number | null;
+}
+
+export interface AsanaTag {
+  gid: string;
+  name: string;
 }
 
 export interface AsanaTask {
   gid: string;
   name: string;
   notes: string;
-  resource_type: 'task';
-  assignee: AsanaRef | null;
-  projects: AsanaRef[];
-  tags: AsanaRef[];
-  memberships: AsanaTaskMembership[];
+  completed: boolean;
+  due_on: string | null;
+  assignee: AsanaUser | null;
+  projects: AsanaProject[];
+  memberships: AsanaMembership[];
+  custom_fields: AsanaCustomField[];
+  tags: AsanaTag[];
   created_at: string;
   modified_at: string;
-  permalink_url?: string;
 }
 
-export interface AsanaTaskMembership {
-  project: AsanaRef;
-  section: AsanaRef | null;
+export interface AsanaTaskWithSubtasks extends AsanaTask {
+  subtasks: AsanaTask[];
 }
 
-export interface AsanaProject {
+export interface AsanaStory {
   gid: string;
-  name: string;
-  resource_type: 'project';
+  created_at: string;
+  created_by: AsanaUser;
+  text: string;
+  type: 'comment' | 'system';
 }
 
-export interface AsanaSection {
-  gid: string;
-  name: string;
-  resource_type: 'section';
+/**
+ * Asana webhook event emitted for resource changes.
+ */
+export interface AsanaWebhookEvent {
+  action: 'added' | 'removed' | 'deleted' | 'undeleted' | 'changed';
+  resource: {
+    gid: string;
+    resource_type: string;
+    resource_subtype?: string;
+  };
+  parent: {
+    gid: string;
+    resource_type: string;
+  } | null;
+  created_at: string;
+  user: AsanaUser | null;
+  change?: {
+    field: string;
+    action: 'added' | 'removed' | 'changed';
+    added_value?: unknown;
+    removed_value?: unknown;
+    new_value?: unknown;
+  };
 }
 
-export interface AsanaTag {
-  gid: string;
-  name: string;
-  color: string;
-  resource_type: 'tag';
+/** Top-level payload sent by Asana to the webhook endpoint. */
+export interface AsanaWebhookPayload {
+  events: AsanaWebhookEvent[];
 }
 
-export interface AsanaAttachment {
-  gid: string;
-  name: string;
-  resource_type: 'attachment';
-  download_url?: string;
-  view_url?: string;
+/** Configuration required to initialise any Asana API client. */
+export interface AsanaConfig {
+  /** Personal access token or OAuth bearer token. */
+  accessToken: string;
+  /** Optional default workspace GID. */
+  workspaceId?: string;
+  /** Optional default project GID. */
+  defaultProjectId?: string;
+  /** HMAC-SHA256 secret used to verify incoming webhook signatures. */
+  webhookSecret?: string;
 }
 
-export interface AsanaErrorDetail {
-  message: string;
-  help?: string;
+/**
+ * Mapping between an Asana section GID and a SemkiEst test status string.
+ */
+export interface SectionMapping {
+  sectionId: string;
+  sectionName: string;
+  testStatus: string;
 }
 
-export interface AsanaErrorResponse {
-  errors?: AsanaErrorDetail[];
+/**
+ * Mapping between an Asana status/enum value name and a SemkiEst test state.
+ */
+export interface StatusMapping {
+  asanaStatus: string;
+  testState: string;
 }
 
-// ─── Input shapes for API calls ──────────────────────────────────────────────
-
-export interface CreateTaskMembership {
-  project: string;
-  section?: string;
+/**
+ * Stored configuration for an Asana project wired to a SemkiEst organisation.
+ */
+export interface AsanaProjectMapping {
+  id: string;
+  organizationId: string;
+  asanaProjectId: string;
+  asanaProjectName: string;
+  asanaWorkspaceId: string;
+  sectionMappings: SectionMapping[];
+  statusMappings: StatusMapping[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface CreateTaskInput {
-  name: string;
-  notes: string;
-  projects: string[];
-  memberships: CreateTaskMembership[];
-  assignee?: string;
+/**
+ * Outcome of a single test run, used to generate Asana task comments and
+ * trigger status transitions.
+ */
+export interface TestResult {
+  testName: string;
+  status: 'passed' | 'failed' | 'skipped' | 'pending';
+  duration?: number;
+  error?: string;
+  projectId?: string;
+  runId?: string;
+  timestamp: Date;
+}
+
+/**
+ * Structured test-case information extracted from an Asana task description.
+ */
+export interface ExtractedTestCase {
+  /** Asana task name used as the test title. */
+  title: string;
+  /** Full task notes used as test description. */
+  description: string;
+  /** Ordered reproduction/test steps parsed from the notes. */
+  steps: string[];
+  /** Expected result text parsed from the notes. */
+  expectedResult: string;
+  /** Tag names attached to the task. */
+  tags: string[];
+  /** Inferred priority from custom fields or tags. */
+  priority: 'high' | 'medium' | 'low';
+  /** Source Asana task GID. */
+  asanaTaskId: string;
+  /** Source Asana task name. */
+  asanaTaskName: string;
 }
