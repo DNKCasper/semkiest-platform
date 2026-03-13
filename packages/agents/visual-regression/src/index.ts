@@ -1,20 +1,25 @@
-export { VisualRegressionAgent } from './visual-agent.js';
-export type { VisualRegressionAgentConfig } from './visual-agent.js';
-export { BaselineManager } from './baseline-manager.js';
-export { ScreenshotCapture } from './screenshot-capture.js';
-export { VIEWPORTS } from './types.js';
+export { DiffEngine } from './diff-engine';
 export type {
-  Baseline,
-  BaselineKey,
-  BaselineStatus,
-  BaselineVersion,
-  CaptureOptions,
-  CaptureResult,
-  S3Config,
-  ScreenshotOptions,
-  Sitemap,
-  SitemapPage,
-  Viewport,
-  VisualRegressionInput,
-  VisualRegressionOutput,
-} from './types.js';
+  DiffOptions,
+  DiffResult,
+  ComponentDiffResult,
+  BatchDiffSummary,
+} from './diff-engine';
+
+export { DiffCategorizer, DiffCategory } from './diff-categorizer';
+export type {
+  CategorizedDiff,
+  CategorizationResult,
+} from './diff-categorizer';
+
+export {
+  getImageMetadata,
+  toRawRGBA,
+  fromRawRGBA,
+  normalizeToSameDimensions,
+  cropRegion,
+  generateSideBySide,
+  generateOverlay,
+  generateHighlightedDiff,
+} from './image-processor';
+export type { Bounds, RawImageData, ImageMetadata } from './image-processor';

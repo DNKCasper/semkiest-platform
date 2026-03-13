@@ -1,13 +1,24 @@
 {
+  "references": [
+    {
+      "path": "../base"
+    }
+  ],
+  "include": [
+    "src",
+    "src/**/*.ts"
+  ],
   "extends": "../../shared-config/tsconfig/node.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
-    "declaration": true,
+    "sourceMap": true,
     "declarationMap": true,
-    "sourceMap": true
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "declaration": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [{ "path": "../base" }]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts"
+  ]
 }
