@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "include": [
+    "src/**/*",
+    "src",
+    "src/**/*.ts"
+  ],
+  "extends": "../../shared-config/tsconfig/node.json",
+  "compilerOptions": {
+    "sourceMap": true,
+    "declarationMap": true,
+    "rootDir": "./src",
+    "composite": true,
+    "outDir": "./dist",
+    "declaration": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts"
+  ]
+}
