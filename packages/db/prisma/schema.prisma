@@ -1,0 +1,97 @@
+// Prisma schema for SemkiEst Platform
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Organization ────────────────────────────────────────────────────────────
+
+model Organization {
+  id            String         @id @default(uuid())
+  name          String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  scoringConfig ScoringConfig?
+  projects      Project[]
+
+  @@map("organizations")
+}
+
+// ─── Scoring Configuration ────────────────────────────────────────────────────
+
+/// Per-organization scoring weight configuration.
+/// Weights must sum to 1.0. Default weights are applied when not customized.
+model ScoringConfig {
+  id                  String       @id @default(uuid())
+  organizationId      String       @unique
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Scoring weights (must sum to 1.0)
+  functionalWeight    Float        @default(0.30)
+  visualWeight        Float        @default(0.20)
+  performanceWeight   Float        @default(0.20)
+  accessibilityWeight Float        @default(0.10)
+  securityWeight      Float        @default(0.10)
+  apiWeight           Float        @default(0.10)
+
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@map("scoring_configs")
+}
+
+// ─── Project ──────────────────────────────────────────────────────────────────
+
+model Project {
+  id             String         @id @default(uuid())
+  name           String
+  team           String?
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  qualityScores  QualityScore[]
+
+  @@map("projects")
+}
+
+// ─── Quality Score ────────────────────────────────────────────────────────────
+
+/// Immutable snapshot of a project's quality score at a point in time.
+/// Used for trend calculation and historical analysis.
+model QualityScore {
+  id                    String   @id @default(uuid())
+  projectId             String
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Composite weighted score (0–100)
+  score                 Float
+
+  /// Pass rates per category (null means category not tested)
+  functionalPassRate    Float?
+  visualPassRate        Float?
+  performancePassRate   Float?
+  accessibilityPassRate Float?
+  securityPassRate      Float?
+  apiPassRate           Float?
+
+  /// Badge assigned based on score threshold
+  badge                 String   // excellent | good | needs_attention | critical
+
+  /// Score trend compared to previous snapshot
+  trend                 String   // improving | declining | stable
+
+  /// Point-in-time when the score was calculated
+  calculatedAt          DateTime @default(now())
+  createdAt             DateTime @default(now())
+
+  @@index([projectId, calculatedAt(sort: Desc)])
+  @@map("quality_scores")
+}
