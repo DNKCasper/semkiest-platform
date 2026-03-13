@@ -1,143 +1,94 @@
 /**
- * Supported document input formats for the SpecReaderAgent.
+ * Acceptance Criteria (AC) schema for the Spec Reader Agent.
+ *
+ * Defines the core types used when parsing Jira and Asana acceptance criteria
+ * into structured, executable test scenarios.
  */
-export type DocumentFormat = 'markdown' | 'pdf' | 'docx' | 'html' | 'text';
+
+/** Supported source systems for acceptance criteria. */
+export type SourceSystem = 'jira' | 'asana' | 'freeform';
 
 /**
- * Semantic classification of a parsed document section.
- * Used to categorise content extracted from spec documents.
+ * Gherkin step keywords.
+ * `And` and `But` inherit the semantic role of the preceding non-connector keyword.
  */
-export type SectionType =
-  | 'requirement'
-  | 'acceptance-criteria'
-  | 'user-story'
-  | 'feature'
-  | 'functional-spec'
-  | 'non-functional-req'
-  | 'heading'
-  | 'paragraph'
-  | 'code-block'
-  | 'table'
-  | 'list';
+export type GherkinKeyword = 'Given' | 'When' | 'Then' | 'And' | 'But';
 
 /**
- * A discrete section extracted from a parsed document.
+ * Semantic role of a step in a test scenario.
+ * - `precondition`: state that must hold before the action (Given)
+ * - `action`: the activity being tested (When)
+ * - `assertion`: the expected outcome (Then)
  */
-export interface DocumentSection {
-  /** Semantic classification of this section */
-  type: SectionType;
-  /** Optional heading/title for the section */
+export type StepRole = 'precondition' | 'action' | 'assertion';
+
+/** A single parsed step within a Gherkin scenario. */
+export interface GherkinStep {
+  /** The original Gherkin keyword used in the source text. */
+  keyword: GherkinKeyword;
+  /** The resolved semantic role after resolving And/But connectors. */
+  role: StepRole;
+  /** The step description, stripped of the leading keyword. */
+  text: string;
+}
+
+/** A complete Gherkin scenario block containing one or more steps. */
+export interface GherkinScenario {
+  /** Optional scenario title extracted from a `Scenario:` header. */
   title?: string;
-  /** Normalised text content of the section */
-  content: string;
-  /** Heading level (1–6) for heading sections */
-  level?: number;
-  /** Individual list items when type === 'list' */
-  items?: string[];
+  /** Ordered list of steps in this scenario. */
+  steps: GherkinStep[];
 }
 
 /**
- * Metadata describing the parsed document's origin and statistics.
+ * An executable test scenario produced from parsed acceptance criteria.
+ * Compatible with all SemkiEst testing agents.
  */
-export interface DocumentMetadata {
-  /** Original source path or URL */
-  source: string;
-  /** Detected or specified document format */
-  format: DocumentFormat;
-  /** Character encoding used when reading the file */
-  encoding?: string;
-  /** Number of pages (PDF only) */
-  pageCount?: number;
-  /** Approximate word count of the normalised content */
-  wordCount: number;
-  /** Character count of the normalised content */
-  characterCount: number;
-  /** Timestamp when parsing completed */
-  parsedAt: Date;
+export interface TestScenario {
+  /** Unique identifier for this scenario, derived from source and index. */
+  id: string;
+  /** Human-readable title for the scenario. */
+  title: string;
+  /** Identifier of the original Jira issue key or Asana task GID. */
+  sourceId: string;
+  /** The system the criteria were sourced from, for traceability. */
+  sourceSystem: SourceSystem;
+  /** Ordered list of precondition descriptions (from Given steps). */
+  preconditions: string[];
+  /** Ordered list of action descriptions (from When steps). */
+  steps: string[];
+  /** Ordered list of assertion descriptions (from Then steps). */
+  assertions: string[];
+  /** The raw acceptance criteria text this scenario was derived from. */
+  rawCriteria: string;
 }
 
-/**
- * Fully parsed and normalised document ready for LLM analysis.
- */
-export interface ParsedDocument {
-  /** Format of the source document */
-  format: DocumentFormat;
-  /** Document title, if detectable */
-  title?: string;
-  /** Full normalised text content */
-  content: string;
-  /** Ordered list of extracted sections */
-  sections: DocumentSection[];
-  /** Metadata about the document and parsing process */
-  metadata: DocumentMetadata;
+/** A single parse error encountered during AC parsing. */
+export interface ParseError {
+  /** Human-readable description of the error. */
+  message: string;
+  /** Optional 1-based line number where the error occurred. */
+  line?: number;
+  /** The raw text that could not be parsed. */
+  raw?: string;
 }
 
-/**
- * Options that control how a document is ingested.
- */
-export interface IngestionOptions {
-  /**
-   * Whether to classify sections by type.
-   * Defaults to true.
-   */
-  extractSections?: boolean;
-  /**
-   * Text encoding for file reads (text/html/markdown).
-   * Defaults to 'utf-8'.
-   */
-  encoding?: BufferEncoding;
-  /**
-   * Network timeout in milliseconds for URL fetches.
-   * Defaults to 10 000 ms.
-   */
-  timeout?: number;
+/** The full result of parsing an acceptance criteria block. */
+export interface ParseResult {
+  /** Identifier of the original source (Jira key or Asana GID). */
+  sourceId: string;
+  /** The system the criteria were sourced from. */
+  sourceSystem: SourceSystem;
+  /** The executable test scenarios extracted from the criteria. */
+  scenarios: TestScenario[];
+  /** Non-fatal errors encountered during parsing. */
+  errors: ParseError[];
 }
 
-/**
- * Describes a single document ingestion request.
- */
-export interface IngestionInput {
-  /** File path or URL to ingest */
-  source: string;
-  /**
-   * Explicit document format.
-   * Auto-detected from the source extension/URL scheme when omitted.
-   */
-  format?: DocumentFormat;
-  /** Optional per-document ingestion options */
-  options?: IngestionOptions;
+/** Options for controlling AC parsing behaviour. */
+export interface ParseOptions {
+  /** Identifier of the source (e.g. Jira issue key `PROJ-123` or Asana task GID). */
+  sourceId: string;
+  /** Explicitly specify the source system, or use `'freeform'` to auto-detect. */
+  sourceSystem: SourceSystem;
 }
-
-/**
- * Result of ingesting a single document.
- */
-export interface IngestionResult {
-  /** Whether parsing succeeded */
-  success: boolean;
-  /** The parsed document (present when success === true) */
-  document?: ParsedDocument;
-  /** Human-readable error message (present when success === false) */
-  error?: string;
-  /** The original source that was processed */
-  source: string;
-}
-
-/**
- * Aggregated result of a batch ingestion operation.
- */
-export interface BatchIngestionResult {
-  /** Individual results in the same order as the input array */
-  results: IngestionResult[];
-  /** Number of documents parsed successfully */
-  successCount: number;
-  /** Number of documents that failed to parse */
-  failureCount: number;
-  /** Total number of documents processed */
-  totalProcessed: number;
-}
-
-/** Union type accepted by SpecReaderAgent.execute() */
-export type SpecReaderInput = IngestionInput | IngestionInput[];
-
-/** Union type returned by SpecReaderAgent.execute() */
-export type SpecReaderOutput = IngestionResult | BatchIngestionResult;
