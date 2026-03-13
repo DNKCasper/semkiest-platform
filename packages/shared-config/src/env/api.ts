@@ -73,6 +73,19 @@ export const apiEnvSchema = databaseEnvSchema.merge(redisEnvSchema).merge(
      * When set, internal endpoints require this key in the X-API-Key header.
      */
     INTERNAL_API_KEY: z.string().min(16).optional(),
+
+    /**
+     * Sentry DSN (Data Source Name) for error tracking.
+     * When set, all unhandled errors are captured and sent to Sentry.
+     * Leave unset to disable Sentry (safe in development/test).
+     */
+    SENTRY_DSN: z.string().url('SENTRY_DSN must be a valid URL').optional(),
+
+    /**
+     * Sentry release identifier (e.g. git commit SHA or semver tag).
+     * Used to associate errors with a specific deployment for source map lookup.
+     */
+    SENTRY_RELEASE: z.string().min(1).optional(),
   }),
 );
 
