@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// Tracks AI credit (token) usage for billing and monitoring
+model AiCreditUsage {
+  id              String   @id @default(cuid())
+  /// Unique identifier for the originating request
+  requestId       String   @unique
+  /// Organization that owns this usage
+  organizationId  String
+  /// Project the request was attributed to (optional)
+  projectId       String?
+  /// Agent type that made the request (optional)
+  agentType       String?
+  /// LLM provider (e.g. "claude", "openai", "gemini")
+  provider        String
+  /// Model name (e.g. "claude-3-5-sonnet-20241022")
+  model           String
+  /// Prompt/input token count
+  inputTokens     Int
+  /// Completion/output token count
+  outputTokens    Int
+  /// Total token count (input + output)
+  totalTokens     Int
+  /// Cost in USD with high precision
+  costUsd         Decimal  @db.Decimal(10, 8)
+  /// Prompt template identifier (optional)
+  templateId      String?
+  /// Prompt template version (optional)
+  templateVersion String?
+  /// Additional metadata (e.g. request tags, model parameters)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([agentType, createdAt])
+  @@index([organizationId, projectId, createdAt])
+  @@map("ai_credit_usage")
+}
