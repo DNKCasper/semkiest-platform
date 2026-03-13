@@ -1,47 +1,43 @@
 {
-  "main": "./dist/index.js",
+  "main": "./src/index.ts",
   "scripts": {
     "lint": "eslint src/",
     "db:seed": "ts-node prisma/seed.ts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "migrate:status": "prisma migrate status",
+    "studio": "prisma studio",
     "db:push": "prisma db push",
-    "build": "tsc --project tsconfig.build.json",
+    "build": "tsc",
     "seed": "tsx prisma/seed.ts",
     "migrate:dev": "prisma migrate dev",
     "seed:dev": "NODE_ENV=development tsx scripts/seed-dev.ts",
-    "studio": "prisma studio",
     "db:generate": "prisma generate",
     "generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "seed:test": "NODE_ENV=test tsx scripts/seed-test.ts",
+    "db:migrate": "prisma migrate dev",
     "migrate:reset": "prisma migrate reset --force",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "prisma migrate dev"
+    "migrate:status": "prisma migrate status"
   },
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "types": "./dist/index.d.ts",
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "description": "Database client and Prisma ORM for SemkiEst platform",
-  "name": "@semkiest/db",
+  "name": "@sem/db",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "prisma": "^5.14.0",
     "typescript": "^5.4.0",
-    "prisma": "^5.10.0",
     "tsx": "^4.7.0",
     "tsup": "^8.0.0"
   },
   "dependencies": {
-    "@prisma/client": "^5.10.0"
+    "@prisma/client": "^5.14.0"
   }
 }

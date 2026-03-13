@@ -1,16 +1,31 @@
 {
-  "extends": "../../packages/shared-config/tsconfig/node.json",
+  "include": [
+    "src/**/*.ts",
+    "src/**/*"
+  ],
+  "extends": "../../tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
   "compilerOptions": {
-    "baseUrl": ".",
-    "outDir": "./dist",
     "rootDir": "./src",
     "paths": {
-      "@semkiest/shared-types": ["../../packages/shared-types/src"],
-      "@semkiest/shared-utils": ["../../packages/shared-utils/src"],
-      "@semkiest/shared-config": ["../../packages/shared-config/src"],
-      "@semkiest/db": ["../../packages/db/src"]
-    }
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+      "@semkiest/shared-types": [
+        "../../packages/shared-types/src"
+      ],
+      "@semkiest/shared-utils": [
+        "../../packages/shared-utils/src"
+      ],
+      "@semkiest/shared-config": [
+        "../../packages/shared-config/src"
+      ],
+      "@semkiest/db": [
+        "../../packages/db/src"
+      ]
+    },
+    "baseUrl": ".",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "outDir": "./dist"
+  }
 }

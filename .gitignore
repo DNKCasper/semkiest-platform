@@ -1,11 +1,5 @@
-node_modules
-.turbo
-dist
-build
-.next
+node_modules/
+dist/
+*.tsbuildinfo
 .env
-.env.local
-.env.*.local
-*.log
-coverage
-.cache
+*.env.local

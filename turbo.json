@@ -17,6 +17,10 @@
         "dist/**",
         ".next/**",
         "!.next/cache/**"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
       ]
     },
     "typecheck": {
@@ -30,6 +34,10 @@
       ],
       "outputs": [
         "coverage/**"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env.test*"
       ]
     },
     "clean": {

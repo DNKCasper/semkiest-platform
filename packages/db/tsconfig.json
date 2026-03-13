@@ -3,7 +3,7 @@
     "src/**/*.ts",
     "src/**/*"
   ],
-  "extends": "../shared-config/tsconfig/node.json",
+  "extends": "../../tsconfig.json",
   "exclude": [
     "node_modules",
     "dist",
@@ -12,12 +12,11 @@
   ],
   "compilerOptions": {
     "noUnusedLocals": true,
-    "resolveJsonModule": true,
     "noUnusedParameters": true,
-    "moduleResolution": "node",
     "lib": [
       "ES2022"
     ],
+    "moduleResolution": "node",
     "rootDir": "./src",
     "forceConsistentCasingInFileNames": true,
     "target": "ES2022",
@@ -27,8 +26,10 @@
     "esModuleInterop": true,
     "sourceMap": true,
     "outDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "skipLibCheck": true,
     "declaration": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "resolveJsonModule": true
   }
 }
