@@ -1,46 +1,65 @@
-/** Approval status for a visual test result */
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+/**
+ * Client-side types for the visual diff viewer and approval workflow UI.
+ * These mirror the server-side types from @semkiest/visual-regression but
+ * are kept local to avoid a build-time dependency on the Node.js agent package.
+ */
 
-/** Viewer layout modes */
-export type ViewMode = 'side-by-side' | 'swipe' | 'overlay';
+export type DiffViewMode = 'side-by-side' | 'overlay' | 'diff-highlight' | 'slider';
 
-/** Diff visualization modes */
-export type DiffMode = 'highlight' | 'diff-only' | 'opacity';
+export type BaselineStatus = 'pending' | 'approved' | 'rejected' | 'auto-approved';
 
-/** A rectangular region of change detected in a visual diff */
-export interface BoundingBox {
-  x: number;
-  y: number;
+export type ApprovalAction = 'approved' | 'rejected' | 'auto-approved';
+
+export interface ScreenshotData {
+  url: string;
   width: number;
   height: number;
+  capturedAt: string;
 }
 
-/** A single visual regression test result */
-export interface VisualTestResult {
-  /** Unique identifier */
+export interface DiffResult {
+  diffPixels: number;
+  totalPixels: number;
+  diffPercentage: number;
+  diffImageUrl?: string;
+}
+
+/** Complete data payload for the diff viewer. */
+export interface DiffViewerData {
+  baselineId: string;
+  componentName: string;
+  viewport: string;
+  version: string;
+  baseline: ScreenshotData;
+  actual: ScreenshotData;
+  diffOverlay?: ScreenshotData;
+  diffResult: DiffResult;
+  status: BaselineStatus;
+  availableViewModes: DiffViewMode[];
+}
+
+/** An immutable approval or rejection record. */
+export interface ApprovalRecord {
   id: string;
-  /** Human-readable test name */
-  testName: string;
-  /** URL to the baseline screenshot */
-  baselineUrl: string | null;
-  /** URL to the actual (new) screenshot */
-  actualUrl: string | null;
-  /** URL to a pre-computed diff image, if available */
-  diffUrl: string | null;
-  /** Current approval status */
-  status: ApprovalStatus;
-  /** Bounding boxes of detected changed regions */
-  changedRegions?: BoundingBox[];
-  /** Percentage of pixels that changed (0–100) */
-  diffPercentage?: number;
-  /** ISO 8601 timestamp */
-  createdAt?: string;
-  /** ISO 8601 timestamp */
-  updatedAt?: string;
+  baselineId: string;
+  action: ApprovalAction;
+  userId: string;
+  userName?: string;
+  comment?: string;
+  previousStatus: BaselineStatus;
+  newStatus: BaselineStatus;
+  version: string;
+  createdAt: string;
 }
 
-/** Natural dimensions of a loaded image */
-export interface ImageDimensions {
-  width: number;
-  height: number;
+/** Summary of a single baseline (used in list views). */
+export interface BaselineSummary {
+  id: string;
+  projectId: string;
+  componentName: string;
+  viewport: string;
+  version: string;
+  diffPercentage?: number;
+  status: BaselineStatus;
+  updatedAt: string;
 }

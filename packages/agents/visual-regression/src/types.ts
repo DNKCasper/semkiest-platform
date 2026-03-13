@@ -1,193 +1,203 @@
 /**
- * Viewport dimensions and identifier for screenshot capture.
+ * Shared types for the Visual Regression Testing Agent.
+ *
+ * These types represent the data structures used across the approval workflow,
+ * API routes, and UI components for visual regression testing.
  */
-export interface Viewport {
-  /** Viewport width in pixels. */
+
+// ─── Enumerations ────────────────────────────────────────────────────────────
+
+/** Visual display mode for the diff viewer. */
+export type DiffViewMode = 'side-by-side' | 'overlay' | 'diff-highlight' | 'slider';
+
+/** Lifecycle state of a visual baseline comparison. */
+export type BaselineStatus = 'pending' | 'approved' | 'rejected' | 'auto-approved';
+
+/** The type of action recorded in the approval history. */
+export type ApprovalAction = 'approved' | 'rejected' | 'auto-approved';
+
+// ─── Screenshot & Diff Data ───────────────────────────────────────────────────
+
+/** Metadata for a single captured screenshot. */
+export interface ScreenshotData {
+  /** Storage URL (e.g. S3 presigned URL or CDN path). */
+  url: string;
   width: number;
-  /** Viewport height in pixels. */
   height: number;
-  /** Human-readable name used in storage keys and reports. */
-  name: string;
+  capturedAt: string; // ISO 8601
 }
 
-/**
- * Built-in responsive breakpoints supported by the visual regression agent.
- */
-export const VIEWPORTS: Readonly<Record<string, Viewport>> = {
-  mobile: { width: 375, height: 812, name: 'mobile' },
-  tablet: { width: 768, height: 1024, name: 'tablet' },
-  desktop: { width: 1440, height: 900, name: 'desktop' },
-  xl: { width: 1920, height: 1080, name: 'xl' },
-} as const;
+/** Pixel-level comparison result produced by the diff engine (SEM-71). */
+export interface DiffResult {
+  /** Number of pixels that differ between baseline and actual. */
+  diffPixels: number;
+  /** Total number of pixels in the comparison area. */
+  totalPixels: number;
+  /** Percentage of differing pixels (0–100). */
+  diffPercentage: number;
+  /** Optional URL to the generated diff-highlight image. */
+  diffImageUrl?: string;
+}
 
-/**
- * Unique composite key that identifies a baseline image in S3.
- * Storage path: {project}/{page}/{viewport}[/{element}].png
- */
-export interface BaselineKey {
-  /** Project/tenant slug (e.g. "semkiest"). */
-  project: string;
-  /** Page slug derived from the URL path (e.g. "dashboard"). */
-  page: string;
-  /** Viewport name from VIEWPORTS (e.g. "desktop"). */
+// ─── Baseline Record ──────────────────────────────────────────────────────────
+
+/** A visual baseline record as returned from the database. */
+export interface VisualBaseline {
+  id: string;
+  projectId: string;
+  componentName: string;
   viewport: string;
-  /** Optional CSS selector for element-level baselines. */
-  element?: string;
-}
+  version: string;
 
-/**
- * Review status of a stored baseline image.
- */
-export type BaselineStatus = 'pending' | 'approved' | 'rejected';
+  baseline: ScreenshotData;
+  actual?: ScreenshotData;
+  diff?: DiffResult;
 
-/**
- * A stored baseline image and its metadata.
- */
-export interface Baseline {
-  key: BaselineKey;
-  /** Full S3 object key for the current approved image. */
-  s3Key: string;
-  /** S3 bucket where the image resides. */
-  s3Bucket: string;
   status: BaselineStatus;
-  /** Monotonically increasing version counter. */
-  version: number;
-  createdAt: Date;
-  updatedAt: Date;
-  /** MD5/SHA-256 hex checksum of the image bytes. */
-  checksum: string;
+  /** Maximum diff percentage for auto-approval (0–100). Null disables auto-approval. */
+  autoApproveThreshold: number | null;
+
+  createdAt: string;
+  updatedAt: string;
 }
 
-/**
- * One entry in the baseline version history log.
- */
-export interface BaselineVersion {
-  version: number;
-  /** S3 object key for this historical snapshot. */
-  s3Key: string;
-  createdAt: Date;
-  checksum: string;
-}
+// ─── Diff Viewer Data ─────────────────────────────────────────────────────────
 
 /**
- * Options controlling how a single screenshot is taken.
+ * Complete data structure for the diff viewer UI.
+ * Supports side-by-side, overlay, diff-highlight, and slider view modes.
  */
-export interface ScreenshotOptions {
-  /** Fully qualified URL to open in the browser. */
-  url: string;
-  /** Viewport to apply before capturing. */
-  viewport: Viewport;
-  /** Capture the entire scrollable page height. Defaults to true. */
-  fullPage?: boolean;
-  /** CSS selector to screenshot a specific element instead of the page. */
-  selector?: string;
-  /** Wait for this selector to appear before capturing. */
-  waitForSelector?: string;
-  /** Additional wait in ms after page load before capturing. */
-  waitForTimeout?: number;
+export interface DiffViewerData {
+  baselineId: string;
+  componentName: string;
+  viewport: string;
+  version: string;
+
+  baseline: ScreenshotData;
+  actual: ScreenshotData;
+  /** Pre-generated diff overlay image, when available. */
+  diffOverlay?: ScreenshotData;
+  diffResult: DiffResult;
+
+  status: BaselineStatus;
+  /** Supported view modes for this comparison. */
+  availableViewModes: DiffViewMode[];
 }
 
-/**
- * A single page entry from an Explorer Agent sitemap.
- */
-export interface SitemapPage {
-  /** Fully qualified URL. */
-  url: string;
-  /** Human-readable page name used as the baseline key page segment. */
-  name: string;
-  /** CSS selectors for element-level captures on this page. */
-  selectors?: string[];
+// ─── Approval History ─────────────────────────────────────────────────────────
+
+/** An immutable record of a single approval or rejection action. */
+export interface ApprovalRecord {
+  id: string;
+  baselineId: string;
+
+  action: ApprovalAction;
+
+  /** User ID, or "system" for automated approvals. */
+  userId: string;
+  userName?: string;
+
+  /** Human-readable comment or rejection reason. */
+  comment?: string;
+
+  previousStatus: BaselineStatus;
+  newStatus: BaselineStatus;
+
+  /** Baseline version at the time of the action. */
+  version: string;
+
+  createdAt: string;
 }
 
-/**
- * Sitemap output from Explorer Agent (SEM-55).
- */
-export interface Sitemap {
-  /** Project slug. */
-  project: string;
-  /** Base URL of the site under test. */
-  baseUrl: string;
-  pages: SitemapPage[];
+// ─── Input Payloads ───────────────────────────────────────────────────────────
+
+/** Input for approving a single baseline. */
+export interface ApproveBaselineInput {
+  userId: string;
+  userName?: string;
+  comment?: string;
 }
 
-/**
- * Per-page capture options for bulk operations.
- */
-export interface CaptureOptions {
-  /** Viewports to capture. Defaults to all VIEWPORTS. */
-  viewports?: Viewport[];
-  /** Whether to capture full page height. Defaults to true. */
-  fullPage?: boolean;
-  /** Additional CSS selectors for element-level capture. */
-  selectors?: string[];
-  /** Selector to wait for before capturing. */
-  waitForSelector?: string;
-  /** Extra delay in ms before capturing. */
-  waitForTimeout?: number;
+/** Input for rejecting a single baseline. */
+export interface RejectBaselineInput {
+  userId: string;
+  userName?: string;
+  /** Mandatory reason for rejection. */
+  reason: string;
 }
 
-/**
- * Screenshot taken during a capture pass.
- */
-export interface CaptureResult {
-  url: string;
-  /** Page name (used as the baseline key page segment). */
-  page: string;
-  viewport: Viewport;
-  /** Raw PNG image bytes. */
-  screenshot: Buffer;
-  /** Set when this is an element-level capture. */
-  element?: string;
-  capturedAt: Date;
+/** Input for batch approve or reject operations. */
+export interface BatchApprovalInput {
+  baselineIds: string[];
+  action: 'approve' | 'reject';
+  userId: string;
+  userName?: string;
+  /** Optional comment/reason applied to all items in the batch. */
+  comment?: string;
 }
 
-/**
- * Input payload for VisualRegressionAgent.execute().
- */
-export interface VisualRegressionInput {
-  /** Project slug. */
-  project: string;
-  /**
-   * Sitemap from Explorer Agent.
-   * If omitted, `pages` must be provided.
-   */
-  sitemap?: Sitemap;
-  /**
-   * Explicit page list.
-   * Used when sitemap integration is not available.
-   */
-  pages?: SitemapPage[];
-  captureOptions?: CaptureOptions;
-  /**
-   * - `capture`: Take screenshots without modifying baselines.
-   * - `create-baselines`: Create new baseline entries (fail if already exist).
-   * - `update-baselines`: Upsert baselines (create or overwrite with pending status).
-   */
-  operation?: 'capture' | 'create-baselines' | 'update-baselines';
+/** Result of a single item within a batch operation. */
+export interface BatchApprovalItemResult {
+  baselineId: string;
+  success: boolean;
+  status?: BaselineStatus;
+  error?: string;
 }
 
-/**
- * Result produced by VisualRegressionAgent.execute().
- */
-export interface VisualRegressionOutput {
-  project: string;
-  capturedPages: number;
-  baselines: Baseline[];
-  errors: string[];
+/** Aggregated result of a batch approve/reject operation. */
+export interface BatchApprovalResult {
+  results: BatchApprovalItemResult[];
+  successCount: number;
+  failureCount: number;
 }
 
-/**
- * S3/MinIO connection configuration for BaselineManager.
- */
-export interface S3Config {
-  bucket: string;
-  region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  /** Custom endpoint for MinIO or other S3-compatible services. */
-  endpoint?: string;
-  /** Required for MinIO; use path-style URLs. */
-  forcePathStyle?: boolean;
-  /** Optional CDN base URL for public asset serving. */
-  publicUrl?: string;
+// ─── Auto-Approval Configuration ─────────────────────────────────────────────
+
+/** Project-level or global configuration for the auto-approval feature. */
+export interface AutoApproveConfig {
+  enabled: boolean;
+  /** Max diff percentage (0–100) below which diffs are automatically approved. */
+  threshold: number;
+  /** When set, applies only to this project; otherwise applies globally. */
+  projectId?: string;
+}
+
+// ─── Repository Interface (for dependency injection / testing) ────────────────
+
+/** Database access interface used by the ApprovalWorkflow. */
+export interface BaselineRepository {
+  findById(id: string): Promise<VisualBaseline | null>;
+  findMany(query: BaselineQuery): Promise<VisualBaseline[]>;
+  update(id: string, data: BaselineUpdateData): Promise<VisualBaseline>;
+  createApprovalRecord(data: CreateApprovalRecordData): Promise<ApprovalRecord>;
+  findApprovalHistory(baselineId: string): Promise<ApprovalRecord[]>;
+}
+
+/** Query parameters for listing baselines. */
+export interface BaselineQuery {
+  projectId?: string;
+  status?: BaselineStatus;
+  componentName?: string;
+  viewport?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/** Mutable fields allowed when updating a baseline record. */
+export interface BaselineUpdateData {
+  status?: BaselineStatus;
+  autoApproveThreshold?: number | null;
+  version?: string;
+}
+
+/** Data required to create a new approval history record. */
+export interface CreateApprovalRecordData {
+  baselineId: string;
+  action: ApprovalAction;
+  userId: string;
+  userName?: string;
+  comment?: string;
+  previousStatus: BaselineStatus;
+  newStatus: BaselineStatus;
+  version: string;
 }

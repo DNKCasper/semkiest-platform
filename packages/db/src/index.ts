@@ -1,15 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 
-// Re-export all Prisma types for consumers
-export { Prisma, PrismaClient } from '@prisma/client';
-export type { AiCreditUsage } from '@prisma/client';
-
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-
 /**
- * Singleton Prisma client instance.
- * Reuses the same connection across hot-reloads in development.
+ * Global singleton Prisma client for the SemkiEst platform.
+ *
+ * In development, the client is stored on `globalThis` to survive hot-reloads
+ * without creating runaway connections. In production a single instance is
+ * created once per process.
  */
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
 export const prisma: PrismaClient =
   globalForPrisma.prisma ??
   new PrismaClient({
@@ -22,3 +23,5 @@ export const prisma: PrismaClient =
 if (process.env['NODE_ENV'] !== 'production') {
   globalForPrisma.prisma = prisma;
 }
+
+export * from '@prisma/client';

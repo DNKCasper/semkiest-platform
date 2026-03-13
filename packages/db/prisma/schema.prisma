@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is the Prisma schema file for the SemkiEst platform.
+// Documentation: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -11,40 +11,103 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-/// Tracks AI credit (token) usage for billing and monitoring
-model AiCreditUsage {
-  id              String   @id @default(cuid())
-  /// Unique identifier for the originating request
-  requestId       String   @unique
-  /// Organization that owns this usage
-  organizationId  String
-  /// Project the request was attributed to (optional)
-  projectId       String?
-  /// Agent type that made the request (optional)
-  agentType       String?
-  /// LLM provider (e.g. "claude", "openai", "gemini")
-  provider        String
-  /// Model name (e.g. "claude-3-5-sonnet-20241022")
-  model           String
-  /// Prompt/input token count
-  inputTokens     Int
-  /// Completion/output token count
-  outputTokens    Int
-  /// Total token count (input + output)
-  totalTokens     Int
-  /// Cost in USD with high precision
-  costUsd         Decimal  @db.Decimal(10, 8)
-  /// Prompt template identifier (optional)
-  templateId      String?
-  /// Prompt template version (optional)
-  templateVersion String?
-  /// Additional metadata (e.g. request tags, model parameters)
-  metadata        Json?
-  createdAt       DateTime @default(now())
+// ─── Project Management ───────────────────────────────────────────────────────
 
-  @@index([organizationId, createdAt])
-  @@index([projectId, createdAt])
-  @@index([agentType, createdAt])
-  @@index([organizationId, projectId, createdAt])
-  @@map("ai_credit_usage")
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("active") // active | inactive | archived
+  environment String   @default("development") // development | staging | production
+  urls        String[]
+  tags        String[]
+  owner       String?
+  team        String?
+
+  baselines VisualBaseline[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([environment])
+}
+
+// ─── Visual Regression Testing ───────────────────────────────────────────────
+
+/// A visual baseline record representing a screenshot comparison result.
+model VisualBaseline {
+  id          String  @id @default(cuid())
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Unique name identifying the component or page being tested
+  componentName String
+  /// Viewport dimensions, e.g. "1920x1080" or "375x812"
+  viewport      String
+  /// Semantic version of this baseline, e.g. "1", "2"
+  version       String @default("1")
+
+  // Baseline (reference) screenshot
+  baselineUrl          String
+  baselineWidth        Int
+  baselineHeight       Int
+  baselineCapturedAt   DateTime
+
+  // Actual (current run) screenshot
+  actualUrl          String?
+  actualWidth        Int?
+  actualHeight       Int?
+  actualCapturedAt   DateTime?
+
+  // Diff computation results
+  diffImageUrl    String?
+  diffPixels      Int?
+  totalPixels     Int?
+  diffPercentage  Float?
+
+  /// Current approval status: pending | approved | rejected | auto-approved
+  status String @default("pending")
+
+  /// Maximum diff percentage below which diffs are automatically approved (0–100).
+  /// Null means auto-approval is disabled for this baseline.
+  autoApproveThreshold Float?
+
+  approvalRecords ApprovalRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([componentName, viewport])
+}
+
+/// An immutable audit record tracking every approval or rejection action on a baseline.
+model ApprovalRecord {
+  id         String         @id @default(cuid())
+  baselineId String
+  baseline   VisualBaseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+
+  /// The action taken: approved | rejected | auto-approved
+  action String
+
+  /// ID of the user who performed the action (or "system" for auto-approvals)
+  userId   String
+  userName String?
+
+  /// Optional human-readable comment or rejection reason
+  comment String?
+
+  previousStatus String
+  newStatus      String
+
+  /// Baseline version at the time this action was taken
+  version String
+
+  createdAt DateTime @default(now())
+
+  @@index([baselineId])
+  @@index([userId])
+  @@index([createdAt])
 }

@@ -8,13 +8,22 @@
     "src",
     "src/**/*.ts"
   ],
-  "extends": "../../shared-config/tsconfig/node.json",
+  "extends": "../../../packages/shared-config/tsconfig/node.json",
   "compilerOptions": {
+    "paths": {
+      "@semkiest/db": [
+        "../../../packages/db/src"
+      ],
+      "@semkiest/shared-types": [
+        "../../../packages/shared-types/src"
+      ]
+    },
     "sourceMap": true,
     "declarationMap": true,
     "rootDir": "./src",
     "outDir": "./dist",
-    "declaration": true
+    "declaration": true,
+    "baseUrl": "."
   },
   "exclude": [
     "node_modules",

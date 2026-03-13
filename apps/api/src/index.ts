@@ -1,23 +1,24 @@
 import express from 'express';
-import { authRouter } from './routes/auth.js';
+import { baselinesRouter } from './routes/baselines';
 
 const app = express();
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-/**
- * Health check endpoint. Used by load balancers and monitoring systems.
- */
+// ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/v1/auth', authRouter);
+// ─── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/baselines', baselinesRouter);
 
-/**
- * Global error handler. Catches any unhandled errors from route handlers.
- */
+// ─── 404 Handler ─────────────────────────────────────────────────────────────
+app.use((_req, res) => {
+  res.status(404).json({ message: 'Not found' });
+});
+
+// ─── Error Handler ────────────────────────────────────────────────────────────
 app.use(
   (
     err: Error,
@@ -25,14 +26,13 @@ app.use(
     res: express.Response,
     _next: express.NextFunction,
   ) => {
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ message: err.message ?? 'Internal server error' });
   },
 );
 
-const PORT = Number(process.env['PORT'] ?? 3000);
-
+const PORT = process.env['PORT'] ?? 3001;
 app.listen(PORT, () => {
-  // Server is running — no log statement to avoid noise in production.
+  // Server started
 });
 
 export { app };
