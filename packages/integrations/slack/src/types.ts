@@ -1,141 +1,105 @@
 /**
- * Shared types for the Slack integration package.
- * Used across slack-client, notification-builder, and digest-builder.
+ * Types for Slack slash command and interactive payload handling.
+ * Based on the Slack API specification for slash commands and block interactions.
  */
 
-/**
- * Result of a test run, used to generate notifications and digests.
- */
+/** Payload received from Slack when a slash command is invoked. */
+export interface SlackSlashCommandPayload {
+  token: string;
+  team_id: string;
+  team_domain: string;
+  channel_id: string;
+  channel_name: string;
+  user_id: string;
+  user_name: string;
+  command: string;
+  text: string;
+  api_app_id: string;
+  is_enterprise_install: string;
+  response_url: string;
+  trigger_id: string;
+}
+
+/** Parsed arguments for the /semkiest run command. */
+export interface RunCommandArgs {
+  project: string;
+  profile: string;
+}
+
+/** Parsed arguments for the /semkiest status command. */
+export interface StatusCommandArgs {
+  project: string;
+}
+
+/** Parsed result of a slash command. */
+export type ParsedCommand =
+  | { type: 'run'; args: RunCommandArgs }
+  | { type: 'status'; args: StatusCommandArgs }
+  | { type: 'help' }
+  | { type: 'unknown'; input: string };
+
+/** Result of triggering a test run via the SemkiEst API. */
 export interface TestRunResult {
-  id: string;
-  projectId: string;
-  projectName: string;
-  timestamp: Date;
+  runId: string;
+  project: string;
+  profile: string;
+  status: 'queued' | 'running';
+  dashboardUrl: string;
+}
+
+/** Quality status returned by the SemkiEst API. */
+export interface QualityStatus {
+  project: string;
+  lastRunAt: string | null;
+  passRate: number;
   totalTests: number;
-  passedTests: number;
   failedTests: number;
-  skippedTests: number;
-  /** Duration of the test run in milliseconds. */
-  duration: number;
-  /** Overall quality score from 0–100. */
-  qualityScore: number;
-  /** Full URL to the test run report in the SemkiEst dashboard. */
+  status: 'passing' | 'failing' | 'no_data';
   dashboardUrl: string;
 }
 
-/**
- * A critical bug discovered during a test run.
- */
-export interface CriticalBug {
-  id: string;
-  projectId: string;
-  projectName: string;
-  title: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  description: string;
-  testRunId: string;
-  discoveredAt: Date;
-  /** Full URL to the bug detail page in the SemkiEst dashboard. */
-  dashboardUrl: string;
+/** Slack Block Kit block element. */
+export type Block = Record<string, unknown>;
+
+/** Immediate response body returned to Slack from a slash command endpoint. */
+export interface SlackCommandResponse {
+  response_type: 'in_channel' | 'ephemeral';
+  text?: string;
+  blocks?: Block[];
 }
 
-/**
- * A change in a project's quality score.
- */
-export interface QualityScoreChange {
-  projectId: string;
-  projectName: string;
-  previousScore: number;
-  currentScore: number;
-  /** Absolute change (currentScore - previousScore). */
-  changeAmount: number;
-  /** Percentage change relative to previousScore. */
-  changePercent: number;
-  timestamp: Date;
-  /** Full URL to the project quality page in the SemkiEst dashboard. */
-  dashboardUrl: string;
+/** Action IDs used in interactive button payloads. */
+export const SLACK_ACTION_IDS = {
+  VIEW_REPORT: 'semkiest_view_report',
+  RERUN_TESTS: 'semkiest_rerun_tests',
+  CREATE_BUG_TICKET: 'semkiest_create_bug_ticket',
+} as const;
+
+export type SlackActionId = (typeof SLACK_ACTION_IDS)[keyof typeof SLACK_ACTION_IDS];
+
+/** A single action within an interactive payload. */
+export interface SlackInteractiveAction {
+  action_id: string;
+  block_id: string;
+  type: string;
+  value?: string;
+  action_ts: string;
 }
 
-/**
- * Per-project Slack notification configuration.
- */
-export interface ProjectChannelConfig {
-  projectId: string;
-  /** Slack channel ID (e.g. "C012AB3CD") or channel name (e.g. "#dev-alerts"). */
-  channelId: string;
-  notifyOnCompletion: boolean;
-  notifyOnCriticalBugs: boolean;
-  notifyOnQualityChange: boolean;
-  /**
-   * Minimum absolute quality score change required to trigger a notification.
-   * Default: 5 (i.e. a change of ≥5 points triggers a notification).
-   */
-  qualityChangeThreshold: number;
-}
-
-/**
- * Configuration for the SlackClient.
- */
-export interface SlackClientConfig {
-  /** Slack Bot OAuth token (xoxb-...). Stored encrypted at rest. */
-  botToken: string;
-  /** Optional Slack signing secret for request verification. */
-  signingSecret?: string;
-}
-
-/**
- * Configuration for a digest job (daily or weekly summary).
- */
-export interface DigestConfig {
-  /** Slack channel ID to post the digest to. */
-  channelId: string;
-  schedule: 'daily' | 'weekly';
-  /** IANA timezone string for digest scheduling (e.g. "America/New_York"). */
-  timezone: string;
-  /** Project IDs to include in the digest. Empty array means all projects. */
-  projectIds: string[];
-}
-
-/**
- * Aggregated data for a digest message covering a time period.
- */
-export interface DigestSummary {
-  period: 'daily' | 'weekly';
-  startDate: Date;
-  endDate: Date;
-  projects: ProjectDigestItem[];
-  totalTestRuns: number;
-  totalPassedTests: number;
-  totalFailedTests: number;
-  /** Weighted average quality score across all projects. */
-  overallQualityScore: number;
-  /** Full URL to the digest report in the SemkiEst dashboard. */
-  dashboardUrl: string;
-}
-
-/**
- * Per-project summary item within a digest.
- */
-export interface ProjectDigestItem {
-  projectId: string;
-  projectName: string;
-  testRuns: number;
-  passedTests: number;
-  failedTests: number;
-  /** Current quality score for the project. */
-  qualityScore: number;
-  qualityScoreTrend: 'up' | 'down' | 'stable';
-  /** Full URL to the project in the SemkiEst dashboard. */
-  dashboardUrl: string;
-}
-
-/**
- * Result returned after posting a Slack message.
- */
-export interface SlackNotificationResult {
-  ok: boolean;
-  /** Slack message timestamp, usable as a message identifier. */
-  ts?: string;
-  channel?: string;
-  error?: string;
+/** Payload received from Slack when a user clicks an interactive button. */
+export interface SlackInteractivePayload {
+  type: 'block_actions';
+  api_app_id: string;
+  token: string;
+  trigger_id: string;
+  response_url: string;
+  team: { id: string; domain: string };
+  channel: { id: string; name: string };
+  user: { id: string; username: string; name: string; team_id: string };
+  message: {
+    ts: string;
+    text: string;
+    blocks?: Block[];
+  };
+  actions: SlackInteractiveAction[];
 }

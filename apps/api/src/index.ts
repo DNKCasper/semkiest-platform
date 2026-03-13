@@ -1,51 +1,37 @@
-import express, { type Express } from 'express';
-import { createGitHubRouter } from './routes/integrations/github';
-import { GitHubWebhookService } from './services/github-webhook';
-import { DeployTriggerService, StubTestCoordinator } from './services/deploy-trigger';
+import express from 'express';
+import { WebClient } from '@slack/web-api';
+import { parseApiEnv } from '@semkiest/shared-config/env/api';
+import { parseSlackEnv } from '@semkiest/shared-config/env/slack';
+import { createSlackRouter } from './routes/integrations/slack';
+
+const apiEnv = parseApiEnv();
+const slackEnv = parseSlackEnv();
 
 const app = express();
 
-// Apply JSON body parsing for all routes except the GitHub webhook endpoint,
-// which uses express.raw() internally to preserve the raw body for HMAC
-// signature verification.
-app.use((req, res, next) => {
-  if (req.path === '/integrations/github/webhook') {
-    return next();
-  }
-  express.json()(req, res, next);
-});
+// Global middleware
+app.use(express.json());
 
-// ---------------------------------------------------------------------------
-// Services
-// ---------------------------------------------------------------------------
-
-const webhookService = new GitHubWebhookService({
-  secret: process.env['GITHUB_WEBHOOK_SECRET'],
-});
-
-const deployTrigger = new DeployTriggerService({
-  coordinator: new StubTestCoordinator(),
-});
-
-// ---------------------------------------------------------------------------
-// Routes
-// ---------------------------------------------------------------------------
-
-app.use('/integrations/github', createGitHubRouter(webhookService, deployTrigger));
-
+// Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok' });
 });
 
-// ---------------------------------------------------------------------------
-// Start
-// ---------------------------------------------------------------------------
+// Slack integration routes
+const slackClient = new WebClient(slackEnv.SLACK_BOT_TOKEN);
 
-const port = parseInt(process.env['PORT'] ?? '3001', 10);
-const host = process.env['HOST'] ?? '0.0.0.0';
+app.use(
+  '/integrations/slack',
+  createSlackRouter({
+    signingSecret: slackEnv.SLACK_SIGNING_SECRET,
+    slackClient,
+    apiBaseUrl: slackEnv.SEMKIEST_API_URL,
+    internalApiKey: slackEnv.SEMKIEST_INTERNAL_API_KEY,
+  }),
+);
 
-app.listen(port, host, () => {
-  console.log(`API server listening on http://${host}:${port}`);
+app.listen(apiEnv.PORT, apiEnv.HOST, () => {
+  console.info(`[API] Server listening on http://${apiEnv.HOST}:${apiEnv.PORT}`);
 });
 
-export { app };
+export default app;

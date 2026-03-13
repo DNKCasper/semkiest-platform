@@ -1,38 +1,40 @@
 /**
- * @semkiest/slack — Slack integration for the SemkiEst platform.
+ * @semkiest/slack-integration
  *
- * Provides:
- * - SlackClient: low-level Slack Web API wrapper
- * - NotificationBuilder: sends typed notifications (test runs, bugs, quality)
- * - DigestBuilder: sends scheduled daily/weekly quality digest messages
- * - Block Kit templates: pure functions that build Slack Block Kit blocks
- * - Shared types
+ * Slack integration for SemkiEst providing:
+ * - Slash command handling (/semkiest run, /semkiest status, /semkiest help)
+ * - Interactive button handling (view report, re-run tests, create bug ticket)
+ * - Slack request signature verification
  */
 
-export { SlackClient } from './slack-client';
-export { NotificationBuilder } from './notification-builder';
+export { verifySlackRequest } from './verify-request';
+
 export {
-  DigestBuilder,
-  dailyCronExpression,
-  weeklyCronExpression,
-  getDailyDigestPeriod,
-  getWeeklyDigestPeriod,
-} from './digest-builder';
-export type { DigestSentEvent } from './digest-builder';
+  parseCommand,
+  handleSlashCommand,
+  validateProjectIdentifier,
+  validateProfileName,
+  type CommandHandlerOptions,
+} from './command-handler';
+
 export {
-  buildTestRunBlocks,
-  buildCriticalBugBlocks,
-  buildQualityScoreChangeBlocks,
-  buildDigestBlocks,
-} from './block-kit-templates';
+  handleInteractivePayload,
+  sendResponseUrl,
+  type InteractiveHandlerOptions,
+} from './interactive-handler';
+
 export type {
+  SlackSlashCommandPayload,
+  SlackInteractivePayload,
+  SlackInteractiveAction,
+  SlackCommandResponse,
+  ParsedCommand,
+  RunCommandArgs,
+  StatusCommandArgs,
   TestRunResult,
-  CriticalBug,
-  QualityScoreChange,
-  ProjectChannelConfig,
-  SlackClientConfig,
-  DigestConfig,
-  DigestSummary,
-  ProjectDigestItem,
-  SlackNotificationResult,
+  QualityStatus,
+  Block,
+  SlackActionId,
 } from './types';
+
+export { SLACK_ACTION_IDS } from './types';

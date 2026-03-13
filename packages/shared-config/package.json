@@ -17,9 +17,9 @@
     },
     "./tsconfig/*": "./tsconfig/*.json",
     "./env/slack": {
-      "import": "./dist/env/slack.js",
       "require": "./dist/env/slack.js",
-      "types": "./dist/env/slack.d.ts"
+      "types": "./dist/env/slack.d.ts",
+      "import": "./dist/env/slack.js"
     },
     "./env/web": {
       "require": "./dist/env/web.js",
