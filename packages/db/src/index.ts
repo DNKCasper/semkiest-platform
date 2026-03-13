@@ -1,18 +1,24 @@
 import { PrismaClient } from '@prisma/client';
 
-/**
- * Singleton Prisma client instance for database access.
- * Reuses the existing client in development to avoid exhausting connection pools
- * during hot reloads.
- */
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+// Re-export all Prisma types for consumers
+export { Prisma, PrismaClient } from '@prisma/client';
+export type { AiCreditUsage } from '@prisma/client';
 
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+/**
+ * Singleton Prisma client instance.
+ * Reuses the same connection across hot-reloads in development.
+ */
 export const prisma: PrismaClient =
-  globalForPrisma.prisma ?? new PrismaClient();
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env['NODE_ENV'] === 'development'
+        ? ['query', 'error', 'warn']
+        : ['error'],
+  });
 
 if (process.env['NODE_ENV'] !== 'production') {
   globalForPrisma.prisma = prisma;
 }
-
-export { UserRole } from '@prisma/client';
-export type { User } from '@prisma/client';

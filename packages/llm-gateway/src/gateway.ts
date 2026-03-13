@@ -1,226 +1,151 @@
-import {
-  AgentModelConfig,
-  GatewayConfig,
-  HealthStatus,
-  LLMProvider,
-  LLMRequest,
-  LLMResponse,
-  UsageRecord,
-} from './types';
-import { BaseProvider } from './providers/base';
-import { ProviderFactory } from './providers/factory';
-import { HealthChecker } from './providers/health';
+import { randomUUID } from 'crypto';
+import type { ILLMProvider } from './providers/base.provider.js';
+import { ProviderFactory } from './providers/factory.js';
+import type { ProviderFactoryOptions } from './providers/factory.js';
+import { composeMiddleware } from './middleware/types.js';
+import type { GatewayContext, MiddlewareFn } from './middleware/types.js';
+import { createLoggingMiddleware } from './middleware/logging.middleware.js';
+import type { LoggingMiddlewareOptions } from './middleware/logging.middleware.js';
+import { createTokenTrackingMiddleware } from './middleware/token-tracking.middleware.js';
+import type { TokenTrackingMiddlewareOptions } from './middleware/token-tracking.middleware.js';
+import { createRateLimitingMiddleware } from './middleware/rate-limiting.middleware.js';
+import type { RateLimitingMiddlewareOptions } from './middleware/rate-limiting.middleware.js';
+import type { LLMRequest, LLMResponse, PricingTable } from './types/index.js';
+import { DEFAULT_PRICING_TABLE } from './types/index.js';
+
+/** Options for constructing a gateway with built-in middleware */
+export interface GatewayOptions {
+  /** Provider factory configuration */
+  factory?: ProviderFactoryOptions;
+
+  /** Logging middleware configuration (pass `false` to disable) */
+  logging?: LoggingMiddlewareOptions | false;
+
+  /** Token tracking middleware configuration (pass `false` to disable) */
+  tokenTracking?: TokenTrackingMiddlewareOptions | false;
+
+  /** Rate limiting middleware configuration (pass `false` to disable) */
+  rateLimiting?: RateLimitingMiddlewareOptions | false;
+
+  /**
+   * Additional custom middleware to inject before the built-in middleware.
+   * Middleware runs in the order provided.
+   */
+  middleware?: MiddlewareFn[];
+
+  /** Custom pricing table for cost calculations */
+  pricingTable?: PricingTable;
+}
 
 /**
- * Central LLM Gateway that coordinates multiple providers with:
- * - Per-agent model configuration
- * - Automatic fallback when the primary provider fails
- * - Token usage tracking and cost attribution
- * - Circuit breaker protection via HealthChecker
- * - Provider health monitoring
+ * LLM Gateway — the primary entry point for making LLM requests.
+ *
+ * The gateway composes a middleware pipeline around a provider factory,
+ * providing logging, token tracking, rate limiting, and extensibility.
+ *
+ * ```ts
+ * const gateway = new LLMGateway({
+ *   logging: { logger: myLogger },
+ *   tokenTracking: { db: myDbAdapter },
+ *   rateLimiting: { redis: myRedis, getBudget: async (orgId) => ({ monthlyTokenLimit: 1_000_000 }) },
+ * });
+ *
+ * gateway.registerProvider(claudeProvider);
+ *
+ * const response = await gateway.complete({
+ *   messages: [{ role: 'user', content: 'Hello!' }],
+ *   attribution: { organizationId: 'org_123', projectId: 'proj_456' },
+ * });
+ * ```
  */
 export class LLMGateway {
-  private readonly providers: Map<LLMProvider, BaseProvider>;
-  private readonly agentConfigs: Map<string, AgentModelConfig>;
-  private readonly defaultProvider: LLMProvider;
-  private readonly defaultModel: string | undefined;
-  private readonly healthChecker: HealthChecker;
-  private readonly usageLog: UsageRecord[] = [];
+  private readonly factory: ProviderFactory;
+  private readonly pipeline: (ctx: GatewayContext) => Promise<void>;
+  readonly pricingTable: PricingTable;
 
-  constructor(private readonly config: GatewayConfig) {
-    // Build provider instances from config
-    this.providers = ProviderFactory.createAll(config.providers);
+  constructor(options: GatewayOptions = {}) {
+    this.factory = new ProviderFactory(options.factory);
+    this.pricingTable = options.pricingTable ?? DEFAULT_PRICING_TABLE;
 
-    if (this.providers.size === 0) {
-      throw new Error('[LLMGateway] At least one provider must be configured.');
+    const middlewares: MiddlewareFn[] = [];
+
+    // 1. Custom middleware (outermost — runs first/last)
+    if (options.middleware) {
+      middlewares.push(...options.middleware);
     }
 
-    // Index per-agent model configs by agentType
-    this.agentConfigs = new Map(
-      (config.agentConfigs ?? []).map((ac) => [ac.agentType, ac]),
-    );
+    // 2. Logging middleware
+    if (options.logging !== false) {
+      middlewares.push(createLoggingMiddleware(options.logging ?? {}));
+    }
 
-    // Choose a sensible default provider
-    this.defaultProvider =
-      config.defaultProvider ?? (this.providers.keys().next().value as LLMProvider);
+    // 3. Rate limiting middleware (before token tracking so over-budget requests fail fast)
+    if (options.rateLimiting !== false && options.rateLimiting) {
+      middlewares.push(createRateLimitingMiddleware(options.rateLimiting));
+    }
 
-    this.defaultModel = config.defaultModel;
+    // 4. Token tracking middleware (innermost built-in — closest to provider call)
+    if (options.tokenTracking !== false && options.tokenTracking) {
+      middlewares.push(createTokenTrackingMiddleware(options.tokenTracking));
+    }
 
-    // Wire up health checker
-    this.healthChecker = new HealthChecker(this.providers, {
-      intervalMs: config.healthCheckIntervalMs ?? 60_000,
-      circuitBreakerConfig: config.circuitBreaker,
-    });
+    // Core handler: delegates to the provider factory
+    const coreHandler = async (ctx: GatewayContext): Promise<void> => {
+      ctx.response = await this.factory.complete(ctx.request);
+    };
+
+    this.pipeline = composeMiddleware(middlewares, coreHandler);
   }
 
   /**
-   * Starts the background health-check loop.
-   * Call this after construction if you want automatic health monitoring.
+   * Register an LLM provider with the gateway.
+   *
+   * @param provider - Provider implementation
+   * @param priority - Lower values = higher priority in the fallback chain
    */
-  startHealthChecks(): void {
-    this.healthChecker.start();
-  }
-
-  /** Stops the background health-check loop. */
-  stopHealthChecks(): void {
-    this.healthChecker.stop();
+  registerProvider(provider: ILLMProvider, priority = 100): void {
+    this.factory.register(provider, priority);
   }
 
   /**
-   * Sends a completion request.
+   * Remove a provider (supports hot-swap without restart).
+   */
+  unregisterProvider(name: ILLMProvider['name']): void {
+    this.factory.unregister(name);
+  }
+
+  /**
+   * Return all currently registered provider names.
+   */
+  listProviders(): string[] {
+    return this.factory.listProviders();
+  }
+
+  /**
+   * Send a completion request through the full middleware pipeline.
    *
-   * If `metadata.agentType` matches a registered AgentModelConfig the
-   * configured primary (and fallback) provider+model combination is used.
-   * Otherwise the gateway-level defaults apply.
-   *
-   * The fallback provider is tried automatically when:
-   * - The circuit breaker for the primary provider is open, or
-   * - The primary provider throws an error.
+   * @param request - The request to send. `requestId` is auto-generated if omitted.
+   * @returns The resolved LLM response with usage and cost information.
+   * @throws {GatewayError} on provider failures
+   * @throws {RateLimitError} when the org's monthly budget is exceeded
    */
   async complete(request: LLMRequest): Promise<LLMResponse> {
-    const agentType = request.metadata?.agentType;
-    const agentCfg = agentType ? this.agentConfigs.get(agentType) : undefined;
+    const fullRequest: LLMRequest = {
+      ...request,
+      requestId: request.requestId ?? randomUUID(),
+    };
 
-    // Build an ordered list of (provider, model) pairs to try
-    const candidates = this.buildCandidates(request, agentCfg);
+    const ctx: GatewayContext = {
+      request: fullRequest,
+      meta: {},
+    };
 
-    let lastError: Error | undefined;
+    await this.pipeline(ctx);
 
-    for (const { providerKey, model } of candidates) {
-      // Check circuit breaker
-      if (!this.healthChecker.isProviderAllowed(providerKey)) {
-        lastError = new Error(
-          `[LLMGateway] Circuit breaker is OPEN for provider "${providerKey}". Skipping.`,
-        );
-        continue;
-      }
-
-      const provider = this.providers.get(providerKey);
-      if (!provider) {
-        lastError = new Error(
-          `[LLMGateway] Provider "${providerKey}" is configured in agent config but not available.`,
-        );
-        continue;
-      }
-
-      const resolvedRequest: LLMRequest = { ...request, model };
-
-      try {
-        const response = await provider.complete(resolvedRequest);
-        this.healthChecker.recordOutcome(providerKey, true);
-        this.recordUsage(response);
-        return response;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        this.healthChecker.recordOutcome(providerKey, false);
-        lastError = error;
-        // Continue to next candidate
-      }
+    if (!ctx.response) {
+      throw new Error('Pipeline completed without a response (internal error)');
     }
 
-    throw lastError ?? new Error('[LLMGateway] No providers available to serve the request.');
-  }
-
-  /** Returns the current health status of all providers. */
-  getHealthStatuses(): HealthStatus[] {
-    return this.healthChecker.getAllStatuses();
-  }
-
-  /** Triggers an immediate health check for all providers. */
-  async checkHealth(): Promise<HealthStatus[]> {
-    await this.healthChecker.checkAll();
-    return this.getHealthStatuses();
-  }
-
-  /**
-   * Returns a copy of all usage records accumulated since the gateway started
-   * (or since the last call to `clearUsageLog`).
-   */
-  getUsageLog(): UsageRecord[] {
-    return [...this.usageLog];
-  }
-
-  /**
-   * Returns aggregated token usage grouped by the provided dimension.
-   * Useful for cost attribution by project, agent, or run.
-   */
-  getAggregatedUsage(
-    groupBy: 'projectId' | 'agentId' | 'agentType' | 'provider',
-  ): Map<string, { inputTokens: number; outputTokens: number; estimatedCostUsd: number }> {
-    const result = new Map<
-      string,
-      { inputTokens: number; outputTokens: number; estimatedCostUsd: number }
-    >();
-
-    for (const record of this.usageLog) {
-      const key = groupBy === 'provider' ? record.provider : (record[groupBy] ?? 'unknown');
-      const existing = result.get(key) ?? { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 };
-      result.set(key, {
-        inputTokens: existing.inputTokens + record.inputTokens,
-        outputTokens: existing.outputTokens + record.outputTokens,
-        estimatedCostUsd: existing.estimatedCostUsd + record.estimatedCostUsd,
-      });
-    }
-
-    return result;
-  }
-
-  /** Clears the in-memory usage log. */
-  clearUsageLog(): void {
-    this.usageLog.length = 0;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
-  private buildCandidates(
-    request: LLMRequest,
-    agentCfg: AgentModelConfig | undefined,
-  ): Array<{ providerKey: LLMProvider; model: string | undefined }> {
-    if (agentCfg) {
-      const candidates: Array<{ providerKey: LLMProvider; model: string | undefined }> = [
-        { providerKey: agentCfg.primaryProvider, model: agentCfg.primaryModel },
-      ];
-      if (agentCfg.fallbackProvider) {
-        candidates.push({
-          providerKey: agentCfg.fallbackProvider,
-          model: agentCfg.fallbackModel,
-        });
-      }
-      return candidates;
-    }
-
-    // No agent config — use the request model / gateway default
-    const model = request.model ?? this.defaultModel;
-
-    // Primary: gateway default provider
-    const primary = { providerKey: this.defaultProvider, model };
-    const candidates: Array<{ providerKey: LLMProvider; model: string | undefined }> = [primary];
-
-    // Include any other configured providers as fallbacks
-    for (const key of this.providers.keys()) {
-      if (key !== this.defaultProvider) {
-        candidates.push({ providerKey: key, model: undefined });
-      }
-    }
-
-    return candidates;
-  }
-
-  private recordUsage(response: LLMResponse): void {
-    this.usageLog.push({
-      provider: response.provider,
-      model: response.model,
-      inputTokens: response.usage.inputTokens,
-      outputTokens: response.usage.outputTokens,
-      totalTokens: response.usage.totalTokens,
-      estimatedCostUsd: response.usage.estimatedCostUsd ?? 0,
-      projectId: response.metadata?.projectId,
-      agentId: response.metadata?.agentId,
-      agentType: response.metadata?.agentType,
-      runId: response.metadata?.runId,
-      timestamp: new Date(),
-    });
+    return ctx.response;
   }
 }

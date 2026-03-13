@@ -1,19 +1,28 @@
 {
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/__tests__/**"
+  ],
+  "extends": "../shared-config/tsconfig/node.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "strict": true,
-    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "isolatedModules": true,
+    "strict": true,
     "skipLibCheck": true,
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "module": "commonjs",
+    "declarationMap": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "isolatedModules": true,
+    "rootDir": "./src",
+    "declaration": true,
+    "lib": [
+      "ES2022"
+    ],
+    "esModuleInterop": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }
