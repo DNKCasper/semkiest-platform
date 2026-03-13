@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AuthProvider } from '../lib/auth-context';
 
 export const metadata: Metadata = {
-  title: 'SemkiEst Platform',
-  description: 'Collaborative testing platform',
+  title: 'SemkiEst — Testing Platform',
+  description: 'Organization-wide quality metrics and testing dashboard',
 };
 
 export default function RootLayout({
@@ -14,8 +13,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <AuthProvider>{children}</AuthProvider>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        {children}
       </body>
     </html>
   );
