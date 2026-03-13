@@ -1,32 +1,59 @@
 {
-  "name": "@semkiest/visual-regression",
-  "version": "0.0.0",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "private": true,
+  "devDependencies": {
+    "ts-jest": "^29.1.0",
+    "@jest/globals": "^29.7.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "@types/sharp": "^0.31.1",
+    "tsup": "^8.0.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "@types/pixelmatch": "^5.2.6"
+  },
+  "description": "Visual regression testing agent with pixel-level comparison",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
       "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "lint": "eslint src/",
-    "test": "jest --passWithNoTests",
-    "typecheck": "tsc --noEmit"
-  },
   "dependencies": {
+    "@semkiest/shared-types": "workspace:*",
     "@semkiest/db": "workspace:*",
-    "@semkiest/shared-types": "workspace:*"
+    "@aws-sdk/client-s3": "^3.600.0",
+    "sharp": "^0.33.0",
+    "playwright": "^1.45.0",
+    "pixelmatch": "^5.3.0",
+    "@semkiest/agent-base": "workspace:*"
   },
-  "devDependencies": {
-    "@types/jest": "^29.5.0",
-    "@types/node": "^20.0.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.4.0"
+  "version": "0.0.0",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src/",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts --format cjs,esm --dts"
+  },
+  "name": "@semkiest/visual-regression",
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts"
+    ]
   }
 }
