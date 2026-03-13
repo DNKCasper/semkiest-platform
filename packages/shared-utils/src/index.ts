@@ -1,4 +1,2 @@
-// Shared utility functions for the SemkiEst platform.
-// Utilities will be added here as the platform develops.
-
+// Shared utilities — placeholder for SEM-37+ implementations
 export {};
