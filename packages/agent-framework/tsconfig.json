@@ -1,20 +1,23 @@
 {
+  "extends": "../shared-config/tsconfig/base.json",
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist"
   ],
-  "extends": "../shared-config/tsconfig/node.json",
   "compilerOptions": {
     "paths": {
       "@semkiest/shared-config": [
         "../shared-config/src"
       ]
     },
-    "baseUrl": ".",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "rootDir": "./src",
+    "module": "commonjs",
     "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": [
-    "src/**/*.ts"
-  ]
+    "baseUrl": "."
+  }
 }

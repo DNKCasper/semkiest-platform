@@ -11,15 +11,15 @@
   },
   "description": "Agent framework with event bus and inter-agent communication for SemkiEst platform",
   "exports": {
-    "./tools": {
-      "import": "./dist/tools/index.js",
-      "require": "./dist/tools/index.js",
-      "types": "./dist/tools/index.d.ts"
-    },
     "./events": {
       "import": "./dist/events/index.js",
       "require": "./dist/events/index.js",
       "types": "./dist/events/index.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/tools/index.js",
+      "require": "./dist/tools/index.js",
+      "types": "./dist/tools/index.d.ts"
     },
     ".": {
       "require": "./dist/index.js",
@@ -37,8 +37,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests",
     "lint": "eslint src/",
-    "dev": "tsup src/index.ts src/events/index.ts --format cjs --dts --watch",
-    "build": "tsup src/index.ts src/events/index.ts --format cjs --dts --out-dir dist"
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts --format cjs,esm --dts --out-dir dist"
   },
   "name": "@semkiest/agent-framework"
 }
