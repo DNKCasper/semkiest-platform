@@ -1,0 +1,24 @@
+{
+  "references": [
+    {
+      "path": "../base"
+    }
+  ],
+  "include": [
+    "src",
+    "src/**/*.ts"
+  ],
+  "extends": "../../shared-config/tsconfig/node.json",
+  "compilerOptions": {
+    "sourceMap": true,
+    "declarationMap": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "declaration": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts"
+  ]
+}

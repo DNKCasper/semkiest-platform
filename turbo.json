@@ -1,27 +1,49 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "ui": "tui",
   "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
-    },
-    "lint": {
-      "dependsOn": ["^build"]
+    "typecheck": {
+      "dependsOn": [
+        "^build"
+      ]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": [
+        "coverage/**"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env.test*"
+      ],
+      "dependsOn": [
+        "^build"
+      ]
     },
-    "typecheck": {
-      "dependsOn": ["^build"]
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "dev": {
+      "persistent": true,
+      "cache": false
     },
     "clean": {
       "cache": false
+    },
+    "build": {
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "dependsOn": [
+        "^build"
+      ]
     }
-  }
+  },
+  "ui": "tui"
 }
