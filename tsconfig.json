@@ -1,18 +1,35 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "exclude": [
+    "node_modules",
+    "**/dist/**"
+  ],
   "compilerOptions": {
-    "composite": false,
-    "declaration": true,
-    "declarationMap": true,
-    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "inlineSources": false,
+    "sourceMap": true,
+    "strict": true,
+    "resolveJsonModule": true,
     "isolatedModules": true,
-    "moduleResolution": "bundler",
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "declarationMap": true,
+    "noImplicitReturns": true,
+    "composite": true,
+    "declaration": true,
+    "lib": [
+      "ES2022",
+      "ES2020"
+    ],
+    "noUncheckedIndexedAccess": true,
     "preserveWatchOutput": true,
+    "noUnusedLocals": true,
+    "inlineSources": false,
+    "module": "commonjs",
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
+    "noImplicitAny": true,
     "skipLibCheck": true,
-    "strict": true
-  },
-  "exclude": ["node_modules"]
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "noImplicitOverride": true,
+    "strictNullChecks": true
+  }
 }
