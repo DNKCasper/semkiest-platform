@@ -1,73 +1,74 @@
 {
-  "name": "@semkiest/shared-config",
-  "version": "0.0.0",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "private": true,
+  "devDependencies": {
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0"
+  },
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./env": {
-      "import": "./dist/env/index.js",
-      "require": "./dist/env/index.js",
-      "types": "./dist/env/index.d.ts"
-    },
-    "./env/api": {
-      "import": "./dist/env/api.js",
-      "require": "./dist/env/api.js",
-      "types": "./dist/env/api.d.ts"
-    },
-    "./env/worker": {
-      "import": "./dist/env/worker.js",
-      "require": "./dist/env/worker.js",
-      "types": "./dist/env/worker.d.ts"
-    },
-    "./env/web": {
-      "import": "./dist/env/web.js",
-      "require": "./dist/env/web.js",
-      "types": "./dist/env/web.d.ts"
-    },
-    "./env/database": {
-      "import": "./dist/env/database.js",
-      "require": "./dist/env/database.js",
-      "types": "./dist/env/database.d.ts"
-    },
     "./env/redis": {
-      "import": "./dist/env/redis.js",
       "require": "./dist/env/redis.js",
-      "types": "./dist/env/redis.d.ts"
+      "types": "./dist/env/redis.d.ts",
+      "import": "./dist/env/redis.js"
     },
-    "./env/s3": {
-      "import": "./dist/env/s3.js",
-      "require": "./dist/env/s3.js",
-      "types": "./dist/env/s3.d.ts"
-    },
+    "./tsconfig/*": "./tsconfig/*.json",
     "./env/slack": {
       "import": "./dist/env/slack.js",
       "require": "./dist/env/slack.js",
       "types": "./dist/env/slack.d.ts"
     },
-    "./tsconfig/*": "./tsconfig/*.json"
-  },
-  "scripts": {
-    "build": "tsup src/index.ts src/env/index.ts src/env/api.ts src/env/worker.ts src/env/web.ts src/env/database.ts src/env/redis.ts src/env/s3.ts src/env/slack.ts --format cjs,esm --dts --out-dir dist",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "lint": "eslint src/",
-    "test": "jest --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "./env/web": {
+      "require": "./dist/env/web.js",
+      "types": "./dist/env/web.d.ts",
+      "import": "./dist/env/web.js"
+    },
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./env": {
+      "require": "./dist/env/index.js",
+      "types": "./dist/env/index.d.ts",
+      "import": "./dist/env/index.js"
+    },
+    "./env/api": {
+      "require": "./dist/env/api.js",
+      "types": "./dist/env/api.d.ts",
+      "import": "./dist/env/api.js"
+    },
+    "./env/database": {
+      "require": "./dist/env/database.js",
+      "types": "./dist/env/database.d.ts",
+      "import": "./dist/env/database.js"
+    },
+    "./env/s3": {
+      "require": "./dist/env/s3.js",
+      "types": "./dist/env/s3.d.ts",
+      "import": "./dist/env/s3.js"
+    },
+    "./env/worker": {
+      "require": "./dist/env/worker.js",
+      "types": "./dist/env/worker.d.ts",
+      "import": "./dist/env/worker.js"
+    }
   },
   "dependencies": {
-    "dotenv": "^16.4.0",
-    "zod": "^3.23.0"
+    "zod": "^3.23.0",
+    "dotenv": "^16.4.0"
   },
-  "devDependencies": {
-    "@types/jest": "^29.5.0",
-    "@types/node": "^20.0.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.4.0"
-  }
+  "version": "0.0.0",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src/",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts src/env/index.ts src/env/api.ts src/env/worker.ts src/env/web.ts src/env/database.ts src/env/redis.ts src/env/s3.ts src/env/slack.ts --format cjs,esm --dts --out-dir dist"
+  },
+  "name": "@semkiest/shared-config"
 }
