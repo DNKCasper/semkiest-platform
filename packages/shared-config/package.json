@@ -1,8 +1,69 @@
 {
-  "name": "@semkiest/shared-config",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsup src/index.ts src/env/index.ts src/env/api.ts src/env/worker.ts src/env/web.ts src/env/database.ts src/env/redis.ts src/env/s3.ts --format cjs,esm --dts --out-dir dist",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src/",
+    "test": "jest --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
   "version": "0.0.0",
   "private": true,
+  "types": "./dist/index.d.ts",
+  "name": "@semkiest/shared-config",
   "exports": {
-    "./tsconfig/*": "./tsconfig/*.json"
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./tsconfig/*": "./tsconfig/*.json",
+    "./env/database": {
+      "import": "./dist/env/database.js",
+      "require": "./dist/env/database.js",
+      "types": "./dist/env/database.d.ts"
+    },
+    "./env": {
+      "import": "./dist/env/index.js",
+      "require": "./dist/env/index.js",
+      "types": "./dist/env/index.d.ts"
+    },
+    "./env/web": {
+      "import": "./dist/env/web.js",
+      "require": "./dist/env/web.js",
+      "types": "./dist/env/web.d.ts"
+    },
+    "./env/s3": {
+      "import": "./dist/env/s3.js",
+      "require": "./dist/env/s3.js",
+      "types": "./dist/env/s3.d.ts"
+    },
+    "./env/api": {
+      "import": "./dist/env/api.js",
+      "require": "./dist/env/api.js",
+      "types": "./dist/env/api.d.ts"
+    },
+    "./env/redis": {
+      "import": "./dist/env/redis.js",
+      "require": "./dist/env/redis.js",
+      "types": "./dist/env/redis.d.ts"
+    },
+    "./env/worker": {
+      "import": "./dist/env/worker.js",
+      "require": "./dist/env/worker.js",
+      "types": "./dist/env/worker.d.ts"
+    }
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.0",
+    "zod": "^3.23.0"
   }
 }

@@ -1,10 +1,15 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./base.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    "moduleResolution": "node",
+    "lib": [
+      "ES2022"
+    ],
+    "rootDir": "./src",
     "target": "ES2022",
-    "lib": ["ES2022"],
     "module": "CommonJS",
-    "moduleResolution": "node"
-  }
+    "outDir": "./dist"
+  },
+  "display": "Node.js"
 }

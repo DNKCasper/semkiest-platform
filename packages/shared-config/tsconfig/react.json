@@ -1,11 +1,18 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./base.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "target": "ES2020",
-    "lib": ["dom", "dom.iterable", "ES2022"],
-    "module": "ESNext",
+    "jsx": "react-jsx",
     "moduleResolution": "bundler",
-    "jsx": "react-jsx"
-  }
+    "lib": [
+      "ES2022",
+      "dom",
+      "dom.iterable"
+    ],
+    "rootDir": "./src",
+    "target": "ES2020",
+    "module": "ESNext",
+    "outDir": "./dist"
+  },
+  "display": "React Library"
 }

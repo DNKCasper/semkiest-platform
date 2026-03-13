@@ -1,0 +1,127 @@
+version: 2
+
+updates:
+  # Keep GitHub Actions up to date
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '08:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'github-actions'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+
+  # Keep root npm/pnpm dependencies up to date
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '08:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    groups:
+      typescript:
+        patterns:
+          - 'typescript'
+          - '@typescript-eslint/*'
+      eslint:
+        patterns:
+          - 'eslint'
+          - 'eslint-*'
+      turborepo:
+        patterns:
+          - 'turbo'
+          - '@turbo/*'
+
+  # API package
+  - package-ecosystem: 'npm'
+    directory: '/packages/api'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'api'
+    commit-message:
+      prefix: 'chore(api)'
+      include: 'scope'
+
+  # Web package
+  - package-ecosystem: 'npm'
+    directory: '/packages/web'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'web'
+    commit-message:
+      prefix: 'chore(web)'
+      include: 'scope'
+    groups:
+      next:
+        patterns:
+          - 'next'
+          - 'react'
+          - 'react-dom'
+          - '@types/react'
+          - '@types/react-dom'
+
+  # Database package
+  - package-ecosystem: 'npm'
+    directory: '/packages/database'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'database'
+    commit-message:
+      prefix: 'chore(database)'
+      include: 'scope'
+
+  # Queue package
+  - package-ecosystem: 'npm'
+    directory: '/packages/queue'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'queue'
+    commit-message:
+      prefix: 'chore(queue)'
+      include: 'scope'
+
+  # Shared package
+  - package-ecosystem: 'npm'
+    directory: '/packages/shared'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'shared'
+    commit-message:
+      prefix: 'chore(shared)'
+      include: 'scope'

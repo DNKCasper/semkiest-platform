@@ -1,8 +1,18 @@
 {
+  "include": [
+    "src/**/*.ts",
+    "src"
+  ],
   "extends": "@semkiest/shared-config/tsconfig/node",
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src"]
+    "moduleResolution": "node",
+    "rootDir": "./src",
+    "target": "ES2022",
+    "module": "commonjs",
+    "outDir": "./dist"
+  }
 }
