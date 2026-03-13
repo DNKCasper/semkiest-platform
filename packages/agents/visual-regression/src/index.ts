@@ -1,0 +1,33 @@
+export {
+  ApprovalWorkflow,
+  BaselineNotFoundError,
+  InvalidStatusTransitionError,
+  InsufficientPermissionsError,
+  resolveAutoApproveThreshold,
+  mapDbBaselineToVisualBaseline,
+  mapDbApprovalRecord,
+  type PermissionChecker,
+  type RawDbBaseline,
+  type RawDbApprovalRecord,
+} from './approval-workflow';
+
+export type {
+  DiffViewMode,
+  BaselineStatus,
+  ApprovalAction,
+  ScreenshotData,
+  DiffResult,
+  VisualBaseline,
+  DiffViewerData,
+  ApprovalRecord,
+  ApproveBaselineInput,
+  RejectBaselineInput,
+  BatchApprovalInput,
+  BatchApprovalItemResult,
+  BatchApprovalResult,
+  AutoApproveConfig,
+  BaselineRepository,
+  BaselineQuery,
+  BaselineUpdateData,
+  CreateApprovalRecordData,
+} from './types';

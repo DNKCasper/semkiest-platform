@@ -1,0 +1,14 @@
+{
+  "extends": "../../../packages/shared-config/tsconfig/node.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "paths": {
+      "@semkiest/db": ["../../../packages/db/src"],
+      "@semkiest/shared-types": ["../../../packages/shared-types/src"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
