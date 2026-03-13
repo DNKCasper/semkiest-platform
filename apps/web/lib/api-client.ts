@@ -7,13 +7,10 @@ import type {
   ApiError,
 } from '../types/project';
 import type {
-  TestProfile,
-  ProfileListResponse,
-  ProfileQueryParams,
-  CreateProfileInput,
-  UpdateProfileInput,
-  CloneProfileInput,
-} from '../types/profile';
+  TestRun,
+  RunListResponse,
+  RunQueryParams,
+} from '../types/run';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -55,7 +52,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
+function buildQueryString(params: ProjectQueryParams): string {
   const entries = Object.entries(params).filter(
     ([, v]) => v !== undefined && v !== '',
   );
@@ -104,69 +101,34 @@ export const projectsApi = {
   },
 };
 
-/** Profile API methods */
-export const profilesApi = {
-  /** GET /api/projects/:projectId/profiles */
-  list(
-    projectId: string,
-    params: ProfileQueryParams = {},
-  ): Promise<ProfileListResponse> {
-    return request<ProfileListResponse>(
-      `/api/projects/${projectId}/profiles${buildQueryString(params as Record<string, string | number | boolean | undefined>)}`,
-    );
+/** Test run API methods */
+export const runsApi = {
+  /** GET /api/projects/:projectId/runs */
+  list(projectId: string, params: RunQueryParams = {}): Promise<RunListResponse> {
+    const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== '');
+    const qs = entries.length > 0
+      ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString()}`
+      : '';
+    return request<RunListResponse>(`/api/projects/${projectId}/runs${qs}`);
   },
 
-  /** GET /api/projects/:projectId/profiles/:id */
-  get(projectId: string, id: string): Promise<TestProfile> {
-    return request<TestProfile>(`/api/projects/${projectId}/profiles/${id}`);
+  /** GET /api/projects/:projectId/runs/:runId */
+  get(projectId: string, runId: string): Promise<TestRun> {
+    return request<TestRun>(`/api/projects/${projectId}/runs/${runId}`);
   },
 
-  /** POST /api/projects/:projectId/profiles */
-  create(
-    projectId: string,
-    input: CreateProfileInput,
-  ): Promise<TestProfile> {
-    return request<TestProfile>(`/api/projects/${projectId}/profiles`, {
+  /** POST /api/projects/:projectId/runs */
+  trigger(projectId: string): Promise<TestRun> {
+    return request<TestRun>(`/api/projects/${projectId}/runs`, {
       method: 'POST',
-      body: JSON.stringify(input),
     });
   },
 
-  /** PUT /api/projects/:projectId/profiles/:id */
-  update(
-    projectId: string,
-    id: string,
-    input: UpdateProfileInput,
-  ): Promise<TestProfile> {
-    return request<TestProfile>(
-      `/api/projects/${projectId}/profiles/${id}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(input),
-      },
-    );
-  },
-
-  /** DELETE /api/projects/:projectId/profiles/:id */
-  delete(projectId: string, id: string): Promise<void> {
-    return request<void>(`/api/projects/${projectId}/profiles/${id}`, {
-      method: 'DELETE',
+  /** POST /api/projects/:projectId/runs/:runId/cancel */
+  cancel(projectId: string, runId: string): Promise<TestRun> {
+    return request<TestRun>(`/api/projects/${projectId}/runs/${runId}/cancel`, {
+      method: 'POST',
     });
-  },
-
-  /** POST /api/projects/:projectId/profiles/:id/clone */
-  clone(
-    projectId: string,
-    id: string,
-    input: CloneProfileInput,
-  ): Promise<TestProfile> {
-    return request<TestProfile>(
-      `/api/projects/${projectId}/profiles/${id}/clone`,
-      {
-        method: 'POST',
-        body: JSON.stringify(input),
-      },
-    );
   },
 };
 
