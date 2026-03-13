@@ -15,7 +15,7 @@ export class RedisClient {
   private readonly client: Redis;
   private lastPingAt: string | null = null;
 
-  constructor(private readonly config: RedisConfig) {
+  constructor(config: RedisConfig) {
     const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
     const retryDelayMs = config.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
     const maxRetryDelayMs = config.maxRetryDelayMs ?? DEFAULT_MAX_RETRY_DELAY_MS;

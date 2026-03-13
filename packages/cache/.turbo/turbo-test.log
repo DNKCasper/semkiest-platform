@@ -1,0 +1,79 @@
+
+> @sem/cache@0.0.1 test
+> jest
+
+FAIL src/redis-client.test.ts
+  ● Test suite failed to run
+
+    [96msrc/redis-client.test.ts[0m:[93m1[0m:[93m23[0m - [91merror[0m[90m TS6133: [0m'createRedisClient' is declared but its value is never read.
+
+    [7m1[0m import { RedisClient, createRedisClient, getRedisClient } from './redis-client.js';
+    [7m [0m [91m                      ~~~~~~~~~~~~~~~~~[0m
+    [96msrc/redis-client.test.ts[0m:[93m1[0m:[93m42[0m - [91merror[0m[90m TS6133: [0m'getRedisClient' is declared but its value is never read.
+
+    [7m1[0m import { RedisClient, createRedisClient, getRedisClient } from './redis-client.js';
+    [7m [0m [91m                                         ~~~~~~~~~~~~~~[0m
+
+PASS src/rate-limiter.test.ts
+PASS src/pubsub.test.ts
+  ● Console
+
+    console.info
+      [PubSubManager] Subscribed to channel "test-progress".
+
+      at PubSubManager.subscribe (src/pubsub.ts:76:15)
+
+    console.info
+      [PubSubManager] Subscribed to channel "test-progress".
+
+      at PubSubManager.subscribe (src/pubsub.ts:76:15)
+
+    console.info
+      [PubSubManager] Subscribed to channel "agent-status".
+
+      at PubSubManager.subscribe (src/pubsub.ts:76:15)
+
+    console.info
+      [PubSubManager] Unsubscribed from channel "agent-status".
+
+      at PubSubManager.unsubscribe (src/pubsub.ts:100:15)
+
+    console.info
+      [PubSubManager] Subscribed to channel "test-result".
+
+      at PubSubManager.subscribe (src/pubsub.ts:76:15)
+
+    console.info
+      [PubSubManager] Subscribed to channel "test-progress".
+
+      at PubSubManager.subscribe (src/pubsub.ts:76:15)
+
+    console.info
+      [PubSubManager] Subscribed to channel "agent-status".
+
+      at PubSubManager.subscribe (src/pubsub.ts:76:15)
+
+    console.info
+      [PubSubManager] Subscriber connection closed.
+
+      at PubSubManager.disconnect (src/pubsub.ts:171:13)
+
+    console.info
+      [PubSubManager] Subscriber connection closed.
+
+      at PubSubManager.disconnect (src/pubsub.ts:171:13)
+
+PASS src/cache-service.test.ts
+
+Test Suites: 1 failed, 3 passed, 4 total
+Tests:       35 passed, 35 total
+Snapshots:   0 total
+Time:        0.992 s
+Ran all test suites.
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /private/tmp/symphony_sem_workspaces/SEM-40/packages/cache
+npm error workspace @sem/cache@0.0.1
+npm error location /private/tmp/symphony_sem_workspaces/SEM-40/packages/cache
+npm error command failed
+npm error command sh -c jest
