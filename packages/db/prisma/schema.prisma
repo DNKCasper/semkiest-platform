@@ -1,113 +1,102 @@
-// This is the Prisma schema file for the SemkiEst platform.
-// Documentation: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-// ─── Project Management ───────────────────────────────────────────────────────
+// ─── Data Library Models ──────────────────────────────────────────────────────
 
-model Project {
-  id          String   @id @default(cuid())
+/**
+ * Per-project persistent data library. Each project has at most one library.
+ */
+model DataLibrary {
+  id          String    @id @default(cuid())
+  projectId   String    @unique
   name        String
   description String?
-  status      String   @default("active") // active | inactive | archived
-  environment String   @default("development") // development | staging | production
-  urls        String[]
-  tags        String[]
-  owner       String?
-  team        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  baselines VisualBaseline[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status])
-  @@index([environment])
-}
-
-// ─── Visual Regression Testing ───────────────────────────────────────────────
-
-/// A visual baseline record representing a screenshot comparison result.
-model VisualBaseline {
-  id          String  @id @default(cuid())
-  projectId   String
-  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  /// Unique name identifying the component or page being tested
-  componentName String
-  /// Viewport dimensions, e.g. "1920x1080" or "375x812"
-  viewport      String
-  /// Semantic version of this baseline, e.g. "1", "2"
-  version       String @default("1")
-
-  // Baseline (reference) screenshot
-  baselineUrl          String
-  baselineWidth        Int
-  baselineHeight       Int
-  baselineCapturedAt   DateTime
-
-  // Actual (current run) screenshot
-  actualUrl          String?
-  actualWidth        Int?
-  actualHeight       Int?
-  actualCapturedAt   DateTime?
-
-  // Diff computation results
-  diffImageUrl    String?
-  diffPixels      Int?
-  totalPixels     Int?
-  diffPercentage  Float?
-
-  /// Current approval status: pending | approved | rejected | auto-approved
-  status String @default("pending")
-
-  /// Maximum diff percentage below which diffs are automatically approved (0–100).
-  /// Null means auto-approval is disabled for this baseline.
-  autoApproveThreshold Float?
-
-  approvalRecords ApprovalRecord[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  dataSets    DataSet[]
 
   @@index([projectId])
-  @@index([status])
-  @@index([componentName, viewport])
 }
 
-/// An immutable audit record tracking every approval or rejection action on a baseline.
-model ApprovalRecord {
-  id         String         @id @default(cuid())
-  baselineId String
-  baseline   VisualBaseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+/**
+ * Supported import formats for test data.
+ */
+enum DataFormat {
+  CSV
+  JSON
+  SQL
+}
 
-  /// The action taken: approved | rejected | auto-approved
-  action String
+/**
+ * Audit actions tracked for all data operations.
+ */
+enum AuditAction {
+  LIBRARY_CREATE
+  DATASET_IMPORT
+  DATASET_VERSION_CREATE
+  DATASET_TAG
+  DATASET_BASELINE_SET
+  DATASET_ROLLBACK
+  CLEANUP_EXECUTE
+  CLEANUP_ROLLBACK
+}
 
-  /// ID of the user who performed the action (or "system" for auto-approvals)
-  userId   String
-  userName String?
+/**
+ * A versioned data set within a library. Each version is a separate record.
+ * The combination of (libraryId, name, version) is unique.
+ */
+model DataSet {
+  id          String      @id @default(cuid())
+  libraryId   String
+  name        String
+  version     Int         @default(1)
+  tags        String[]
+  format      DataFormat
+  /// Serialised data content (rows for CSV/JSON, statements for SQL)
+  content     Json
+  /// SHA-256 hex digest of the raw content string for integrity checks
+  checksum    String
+  /// When true, cleanup service will restore this version as the baseline
+  isBaseline  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
 
-  /// Optional human-readable comment or rejection reason
-  comment String?
+  library     DataLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  auditLogs   AuditLog[]
 
-  previousStatus String
-  newStatus      String
+  @@unique([libraryId, name, version])
+  @@index([libraryId])
+  @@index([tags])
+}
 
-  /// Baseline version at the time this action was taken
-  version String
+/**
+ * Immutable audit trail for all data-library operations.
+ */
+model AuditLog {
+  id        String      @id @default(cuid())
+  projectId String
+  dataSetId String?
+  action    AuditAction
+  /// Free-form identity string (user ID, service name, etc.)
+  actor     String?
+  /// Snapshot of relevant state before the operation
+  before    Json?
+  /// Snapshot of relevant state after the operation
+  after     Json?
+  /// Additional operation metadata
+  metadata  Json?
+  createdAt DateTime    @default(now())
 
-  createdAt DateTime @default(now())
+  dataSet   DataSet?    @relation(fields: [dataSetId], references: [id], onDelete: SetNull)
 
-  @@index([baselineId])
-  @@index([userId])
+  @@index([projectId])
+  @@index([dataSetId])
   @@index([createdAt])
 }
