@@ -1,323 +1,278 @@
 /**
- * Core type definitions for the Explorer Agent.
+ * Authentication and session types for the Explorer Agent.
  *
- * These types define the contracts between the crawler output (SEM-51),
- * the interaction discovery layer, the flow analyzer, the scenario generator,
- * and downstream agents (Executor, Validator).
+ * Supports form-based, cookie-based, bearer token, and OAuth authentication
+ * mechanisms for crawling protected areas of applications.
  */
 
 // ---------------------------------------------------------------------------
-// Crawler output types (produced by SEM-51: Site Crawler & Sitemap Builder)
-// ---------------------------------------------------------------------------
-
-/** An input field discovered on a page */
-export interface InputElement {
-  /** CSS selector for the element */
-  selector: string;
-  /** The `name` attribute of the input */
-  name?: string;
-  /** The `type` attribute (text, email, password, number, tel, url, etc.) */
-  type: string;
-  /** Associated label text */
-  label?: string;
-  /** Placeholder text */
-  placeholder?: string;
-  /** Whether the field is marked as required */
-  required: boolean;
-  /** Validation rules derived from HTML attributes (minlength, maxlength, pattern, etc.) */
-  validationRules?: string[];
-}
-
-/** A submit / action button discovered on a page */
-export interface ButtonElement {
-  /** CSS selector for the element */
-  selector: string;
-  /** Visible text of the button */
-  text: string;
-  /** The `type` attribute (submit, button, reset) */
-  type?: string;
-  /** Whether this is a form-submit button */
-  isSubmit?: boolean;
-}
-
-/** A hyperlink discovered on a page */
-export interface PageLink {
-  /** Resolved absolute href */
-  href: string;
-  /** Visible link text */
-  text: string;
-  /** True when the href points outside the crawled domain */
-  isExternal: boolean;
-  /** True when the link appears inside a `<nav>` or nav-like element */
-  isNavigation: boolean;
-}
-
-/** A form element and all of its child fields */
-export interface FormElement {
-  /** CSS selector for the `<form>` element */
-  selector: string;
-  /** The form's `action` attribute (where it posts to) */
-  action?: string;
-  /** The form's `method` attribute (GET / POST) */
-  method?: string;
-  /** All input, select, and textarea children */
-  fields: InputElement[];
-  /** The primary submit button inside this form */
-  submitButton?: ButtonElement;
-}
-
-/**
- * A single page as returned by the site crawler (SEM-51).
- * Acts as the primary input for the Explorer Agent pipeline.
- */
-export interface CrawledPage {
-  /** Absolute URL of the page */
-  url: string;
-  /** Document title */
-  title: string;
-  /** Crawl depth (0 = seed URL) */
-  depth: number;
-  /** HTTP status code received */
-  statusCode: number;
-  /** MIME type of the response */
-  contentType: string;
-  /** All `<form>` elements found on the page */
-  forms: FormElement[];
-  /** All standalone (non-form) buttons */
-  buttons: ButtonElement[];
-  /** All anchor links on the page */
-  links: PageLink[];
-  /** All input elements (may overlap with those inside forms) */
-  inputs: InputElement[];
-  /** Top-level headings (h1–h3) in order of appearance */
-  headings: string[];
-  /** Content of the page's `<meta name="description">` tag */
-  metaDescription?: string;
-  /** ISO-8601 timestamp when the page was crawled */
-  crawledAt: string;
-}
-
-// ---------------------------------------------------------------------------
-// Interaction discovery types
-// ---------------------------------------------------------------------------
-
-/** High-level category of a testable user flow */
-export type FlowType =
-  | 'login'
-  | 'registration'
-  | 'crud_create'
-  | 'crud_read'
-  | 'crud_update'
-  | 'crud_delete'
-  | 'checkout'
-  | 'search_filter'
-  | 'navigation'
-  | 'password_reset'
-  | 'profile_management'
-  | 'unknown';
-
-/** Perceived complexity of an interaction */
-export type InteractionComplexity = 'simple' | 'moderate' | 'complex';
-
-/**
- * A single testable interaction discovered on a crawled page.
- * Represents a concrete UI action a user can perform.
- */
-export interface DiscoveredInteraction {
-  /** Stable deterministic ID derived from the page URL and interaction description */
-  id: string;
-  /** URL of the page where this interaction was found */
-  pageUrl: string;
-  /** Title of the page where this interaction was found */
-  pageTitle: string;
-  /** Category of action */
-  type:
-    | 'form_submission'
-    | 'button_click'
-    | 'navigation'
-    | 'search'
-    | 'authentication'
-    | 'data_manipulation';
-  /** Human-readable description of the interaction */
-  description: string;
-  /** Raw HTML elements that make up this interaction */
-  elements: Array<InputElement | ButtonElement | PageLink | FormElement>;
-  /** The user-flow this interaction belongs to */
-  flowType: FlowType;
-  /** How many steps / fields are involved */
-  complexity: InteractionComplexity;
-  /** Whether the interaction requires the user to be authenticated first */
-  requiresAuth: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// User flow types
+// Authentication configuration types
 // ---------------------------------------------------------------------------
 
 /**
- * A logical user flow composed of one or more related interactions
- * that span one or more pages.
+ * Supported authentication mechanisms for the Explorer Agent.
  */
-export interface UserFlow {
-  /** Stable deterministic ID derived from flow type and involved pages */
-  id: string;
-  /** Semantic type of the flow */
-  type: FlowType;
-  /** Short human-readable name (e.g. "User Login Flow") */
+export type AuthType = 'form' | 'cookie' | 'bearer' | 'oauth' | 'none';
+
+/**
+ * A single browser cookie to inject into a Playwright browser context.
+ */
+export interface CookieEntry {
   name: string;
-  /** Longer description explaining what the flow accomplishes */
-  description: string;
-  /** Ordered list of page URLs involved in the flow */
-  involvedPages: string[];
-  /** All interactions that make up this flow */
-  interactions: DiscoveredInteraction[];
-  /**
-   * Priority score (1–10).  Higher values mean more important.
-   * Derived from page importance, flow type, and interaction complexity.
-   */
-  priority: number;
-  /** Overall complexity of completing the entire flow */
-  complexity: InteractionComplexity;
-}
-
-// ---------------------------------------------------------------------------
-// Test scenario / test suite types
-// (schema shared with Executor and Validator agents)
-// ---------------------------------------------------------------------------
-
-/** Importance level of a generated test scenario */
-export type ScenarioPriority = 'critical' | 'high' | 'medium' | 'low';
-
-/** The type of UI action a test step performs */
-export type TestAction =
-  | 'navigate'
-  | 'click'
-  | 'type'
-  | 'select'
-  | 'check'
-  | 'uncheck'
-  | 'hover'
-  | 'wait'
-  | 'assert'
-  | 'scroll'
-  | 'clear';
-
-/** A single step inside a test scenario */
-export interface TestStep {
-  /** 1-based ordinal */
-  stepNumber: number;
-  /** What the step does in plain English */
-  description: string;
-  /** The UI action to perform */
-  action: TestAction;
-  /**
-   * CSS selector, URL, or element label identifying the target.
-   * Use accessible-name selectors (role/text) when available.
-   */
-  target: string;
-  /** Value to type, option to select, or URL to navigate to */
-  value?: string;
-  /** What should be true after this step completes */
-  expectedOutcome: string;
-}
-
-/** A condition that must be satisfied before a scenario can run */
-export interface TestPrerequisite {
-  /** Category of the prerequisite */
-  type: 'authentication' | 'data' | 'state' | 'permission';
-  /** Plain-English description */
-  description: string;
+  value: string;
+  /** Cookie domain (e.g. ".example.com"). Required for Playwright injection. */
+  domain?: string;
+  path?: string;
+  httpOnly?: boolean;
+  secure?: boolean;
+  /** Expiry timestamp in seconds since Unix epoch. */
+  expires?: number;
+  sameSite?: 'Strict' | 'Lax' | 'None';
 }
 
 /**
- * A fully-specified, executable test scenario.
- * This is the primary output artifact consumed by the Executor and Validator agents.
+ * Form-based login configuration.
+ * The agent navigates to `loginUrl`, fills in username/password fields,
+ * and submits the form before starting the crawl.
  */
-export interface TestScenario {
-  /** Stable deterministic ID */
-  id: string;
-  /** Short title (≤ 80 chars) */
-  title: string;
-  /** Detailed description of what is being tested and why */
-  description: string;
-  /** The user-flow category this scenario exercises */
-  flowType: FlowType;
-  /** Relative importance of the scenario */
-  priority: ScenarioPriority;
-  /** Conditions that must be met before the scenario starts */
-  prerequisites: TestPrerequisite[];
-  /** Ordered list of actions the user (or bot) must perform */
-  steps: TestStep[];
-  /** Global assertions that must hold after all steps complete */
-  expectedOutcomes: string[];
-  /** Searchable tags (e.g. ["smoke", "auth", "edge-case"]) */
-  tags: string[];
-  /** URL of the page where the scenario begins */
-  pageUrl: string;
-  /** Estimated wall-clock time to execute the scenario in seconds */
-  estimatedDuration?: number;
+export interface FormAuthConfig {
+  type: 'form';
+  /** URL of the login page (absolute). */
+  loginUrl: string;
+  /** CSS selector for the username/email input field. */
+  usernameSelector: string;
+  /** CSS selector for the password input field. */
+  passwordSelector: string;
+  /** CSS selector for the submit button. Defaults to `[type="submit"]`. */
+  submitSelector?: string;
+  /** Username / email credential. Prefer reading from env at call-site. */
+  username: string;
+  /** Password credential. Prefer reading from env at call-site. */
+  password: string;
+  /**
+   * A URL pattern or CSS selector that the agent checks after login to
+   * confirm the login was successful. If the URL contains this string
+   * (or the selector is present in the DOM) the login is considered
+   * successful.  When omitted the agent checks that the page URL changed
+   * away from `loginUrl`.
+   */
+  successIndicator?: string;
+  /** Wait for full navigation after submit. Defaults to true. */
+  waitForNavigation?: boolean;
+  /**
+   * Maximum milliseconds to wait for the post-login page to settle.
+   * Defaults to 10 000 ms.
+   */
+  loginTimeoutMs?: number;
 }
 
 /**
- * A named collection of thematically related test scenarios.
- * Grouped by user-flow type for easy filtering and reporting.
+ * Cookie injection configuration.
+ * Cookies are injected into the Playwright browser context before crawling
+ * begins — no login UI interaction required.
  */
-export interface TestSuite {
-  /** Stable deterministic ID */
-  id: string;
-  /** Human-readable suite name (e.g. "Login & Authentication Suite") */
-  name: string;
-  /** What the suite covers */
-  description: string;
-  /** The user-flow category that unifies all scenarios in the suite */
-  flowType: FlowType;
-  /** All scenarios belonging to this suite, ordered by priority */
-  scenarios: TestScenario[];
-  /** Highest priority among all contained scenarios */
-  priority: ScenarioPriority;
-  /** ISO-8601 creation timestamp */
-  createdAt: string;
+export interface CookieAuthConfig {
+  type: 'cookie';
+  cookies: CookieEntry[];
 }
 
+/**
+ * Bearer token authentication configuration.
+ * The token is sent as an HTTP header on every request intercepted by
+ * the Playwright browser context.
+ */
+export interface BearerTokenAuthConfig {
+  type: 'bearer';
+  token: string;
+  /** HTTP header name. Defaults to `"Authorization"`. */
+  headerName?: string;
+  /** Header value prefix. Defaults to `"Bearer "`. */
+  prefix?: string;
+}
+
+/**
+ * OAuth / OpenID Connect configuration.
+ * The agent performs a browser-based OAuth login flow before crawling.
+ */
+export interface OAuthAuthConfig {
+  type: 'oauth';
+  /** URL where the OAuth provider presents the login UI. */
+  loginUrl: string;
+  /** CSS selector for the username/email input field. */
+  usernameSelector: string;
+  /** CSS selector for the password input field. */
+  passwordSelector: string;
+  /** CSS selector for the submit/continue button. */
+  submitSelector?: string;
+  /** Username credential. Prefer reading from env at call-site. */
+  username: string;
+  /** Password credential. Prefer reading from env at call-site. */
+  password: string;
+  /**
+   * Optional callback that extracts the access token from the page after
+   * successful OAuth login (e.g. from localStorage / sessionStorage).
+   */
+  tokenExtractor?: (context: PlaywrightBrowserContext) => Promise<string>;
+  /** Maximum milliseconds for the OAuth flow. Defaults to 30 000 ms. */
+  loginTimeoutMs?: number;
+}
+
+/**
+ * No authentication required; crawl public pages only.
+ */
+export interface NoAuthConfig {
+  type: 'none';
+}
+
+/** Union of all supported authentication configuration types. */
+export type AuthConfig =
+  | FormAuthConfig
+  | CookieAuthConfig
+  | BearerTokenAuthConfig
+  | OAuthAuthConfig
+  | NoAuthConfig;
+
 // ---------------------------------------------------------------------------
-// LLM gateway interface (SEM-46 dependency)
+// Credential sets (multi-role support)
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal interface for an LLM completion backend.
- * The default implementation uses the Anthropic Claude API.
- * Inject a custom implementation to use a different provider or a mock.
+ * A named credential set that associates a user role with authentication
+ * configuration.  This allows the crawler to test the same application
+ * as multiple user roles (e.g. "admin", "editor", "viewer").
  */
-export interface LLMClient {
-  /**
-   * Send a prompt to the language model and return the text response.
-   * @param prompt - The user-turn message
-   * @param systemPrompt - Optional system instructions
-   */
-  complete(prompt: string, systemPrompt?: string): Promise<string>;
+export interface CredentialSet {
+  /** Human-readable role name (e.g. "admin", "guest"). */
+  role: string;
+  /** Authentication configuration for this role. */
+  auth: AuthConfig;
 }
 
 // ---------------------------------------------------------------------------
-// Explorer agent configuration
+// Session state
 // ---------------------------------------------------------------------------
 
-/** Options for customising Explorer Agent behaviour */
-export interface ExplorerConfig {
-  /** Custom LLM client; defaults to Anthropic Claude if omitted */
-  llmClient?: LLMClient;
+/**
+ * Snapshot of the current authentication session maintained by the
+ * SessionManager.
+ */
+export interface SessionState {
+  /** Whether the session is currently authenticated. */
+  isAuthenticated: boolean;
+  /** Which authentication mechanism was used to establish the session. */
+  authType: AuthType;
+  /** Cookies present in the browser context after authentication. */
+  cookies?: CookieEntry[];
+  /** Active bearer token (if bearer or oauth auth was used). */
+  bearerToken?: string;
   /**
-   * Maximum number of test scenarios to generate per user flow.
-   * Default: 5
+   * Timestamp after which the session should be considered expired and
+   * re-authentication attempted.
    */
-  maxScenariosPerFlow?: number;
+  expiresAt?: Date;
+  /** Identifier for the authenticated user (if discoverable). */
+  userId?: string;
+  /** Role that was used to create this session. */
+  role?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Authentication results
+// ---------------------------------------------------------------------------
+
+/**
+ * Result returned by AuthHandler after an authentication attempt.
+ */
+export interface AuthResult {
+  /** Whether the authentication was successful. */
+  success: boolean;
+  /** Session state established by the successful authentication. */
+  session?: SessionState;
+  /** Human-readable error message (only present when `success` is false). */
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Crawl authentication options
+// ---------------------------------------------------------------------------
+
+/**
+ * Options controlling authentication behaviour during a crawl operation.
+ */
+export interface CrawlAuthOptions {
   /**
-   * Whether to generate edge-case scenarios (validation errors, missing fields, etc.).
-   * Default: true
+   * Authentication configuration.  Supply a single `AuthConfig` to use one
+   * set of credentials, or an array of `CredentialSet` objects to test
+   * multiple user roles.
    */
-  includeEdgeCases?: boolean;
+  credentials?: AuthConfig | CredentialSet[];
   /**
-   * Strategy used to order scenarios within a suite.
-   * Default: 'combined'
+   * How long (in milliseconds) an established session is considered valid
+   * before the agent will attempt re-authentication.  Defaults to 3 600 000
+   * (1 hour).
    */
-  prioritizationStrategy?: 'importance' | 'complexity' | 'combined';
+  sessionTimeoutMs?: number;
+  /**
+   * Whether to attempt re-authentication automatically when the agent detects
+   * that it has been redirected to a login page mid-crawl.  Defaults to true.
+   */
+  retryOnAuthFailure?: boolean;
+  /**
+   * Maximum number of re-authentication attempts before giving up.
+   * Defaults to 3.
+   */
+  maxAuthRetries?: number;
+  /**
+   * CSS selectors or URL patterns that indicate a page requires
+   * authentication.  The agent uses these to detect mid-crawl auth failures.
+   */
+  authRequiredIndicators?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Playwright compatibility shim
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal interface representing a Playwright BrowserContext so that callers
+ * do not need to import the full playwright package at the type level.
+ * The actual Playwright BrowserContext is structurally compatible.
+ */
+export interface PlaywrightBrowserContext {
+  addCookies(cookies: CookieEntry[]): Promise<void>;
+  cookies(urls?: string[]): Promise<CookieEntry[]>;
+  setExtraHTTPHeaders(headers: Record<string, string>): Promise<void>;
+  newPage(): Promise<PlaywrightPage>;
+  close(): Promise<void>;
+}
+
+/**
+ * Minimal interface representing a Playwright Page so that auth handler
+ * logic can be unit-tested without requiring a real browser.
+ */
+export interface PlaywrightPage {
+  goto(url: string, options?: { timeout?: number; waitUntil?: string }): Promise<unknown>;
+  waitForNavigation(options?: { timeout?: number }): Promise<unknown>;
+  waitForSelector(selector: string, options?: { timeout?: number }): Promise<unknown>;
+  fill(selector: string, value: string): Promise<void>;
+  click(selector: string): Promise<void>;
+  url(): string;
+  $(selector: string): Promise<unknown>;
+  evaluate<T>(fn: () => T): Promise<T>;
+  close(): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Logger interface
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal logging interface accepted by AuthHandler and SessionManager.
+ * Compatible with console, pino, winston, etc.
+ */
+export interface Logger {
+  info(msg: string, ...args: unknown[]): void;
+  warn(msg: string, ...args: unknown[]): void;
+  error(msg: string, ...args: unknown[]): void;
+  debug(msg: string, ...args: unknown[]): void;
 }
