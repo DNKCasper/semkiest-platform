@@ -1,98 +1,108 @@
-import { EventEmitter } from 'events';
-import { randomUUID } from 'crypto';
-import type { AgentConfig, AgentResult, AgentStatus } from './types';
+/**
+ * BaseAgent — abstract foundation for all SemkiEst agents.
+ *
+ * Every concrete agent must:
+ * 1. Call `super(config)` in its constructor.
+ * 2. Implement `onInitialize()` to set up internal state / connections.
+ * 3. Implement `execute()` to perform the agent's primary action.
+ */
+
+/** Configuration provided to every agent at construction time. */
+export interface AgentConfig {
+  /** Human-readable agent name used in logs and metadata. */
+  name: string;
+  /** SemVer string for the agent implementation. */
+  version: string;
+  /** Optional one-line description of what the agent does. */
+  description?: string;
+}
+
+/** Execution context passed to `execute()` on each invocation. */
+export interface AgentContext {
+  /** The project this invocation belongs to. */
+  projectId: string;
+  /** Optional session identifier for correlating multiple invocations. */
+  sessionId?: string;
+  /** Arbitrary caller-provided metadata. */
+  metadata?: Record<string, unknown>;
+}
+
+/** Standardised envelope returned by every agent execution. */
+export interface AgentResult<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  /** ISO-8601 timestamp of when the result was produced. */
+  timestamp: Date;
+}
 
 /**
  * Abstract base class for all SemkiEst agents.
  *
- * Provides lifecycle management (initialize / run / stop), status tracking,
- * and a typed EventEmitter surface so agents can stream progress events to
- * callers without coupling to a specific transport.
- *
- * @example
- * ```ts
- * class MyAgent extends BaseAgent<MyConfig, MyResult> {
- *   async initialize() { ... }
- *   async run()        { ... }
- *   async stop()       { ... }
- * }
+ * Lifecycle:
+ * ```
+ * const agent = new MyAgent(config);
+ * await agent.initialize();            // one-time setup
+ * const result = await agent.execute(ctx, input);
  * ```
  */
-export abstract class BaseAgent<
-  TConfig extends AgentConfig = AgentConfig,
-  TResult = unknown,
-> extends EventEmitter {
-  /** Resolved config with any defaults applied. */
-  protected readonly config: TConfig & Required<Pick<AgentConfig, 'id'>>;
+export abstract class BaseAgent {
+  protected readonly name: string;
+  protected readonly version: string;
+  protected readonly description: string;
 
-  private _status: AgentStatus = 'idle';
+  private _initialized = false;
 
-  constructor(config: TConfig) {
-    super();
-    this.config = {
-      ...config,
-      id: config.id ?? randomUUID(),
-    } as TConfig & Required<Pick<AgentConfig, 'id'>>;
+  constructor(config: AgentConfig) {
+    this.name = config.name;
+    this.version = config.version;
+    this.description = config.description ?? '';
   }
 
-  // ---------------------------------------------------------------------------
-  // Abstract lifecycle interface
-  // ---------------------------------------------------------------------------
-
   /**
-   * Perform any async setup before `run()` is called.
-   * Implementations should validate prerequisites and acquire resources.
+   * Initialise the agent. Must be called once before `execute()`.
+   * Internally delegates to `onInitialize()` for subclass-specific logic.
    */
-  abstract initialize(): Promise<void>;
-
-  /**
-   * Execute the agent's primary work and return a typed result.
-   * Must set status to 'running' at the start and 'stopped' (or 'error') at the end.
-   */
-  abstract run(): Promise<AgentResult<TResult>>;
-
-  /**
-   * Gracefully stop an in-progress run.
-   * Should attempt to release resources even if called from an error state.
-   */
-  abstract stop(): Promise<void>;
-
-  // ---------------------------------------------------------------------------
-  // Public accessors
-  // ---------------------------------------------------------------------------
-
-  /** Unique identifier assigned at construction. */
-  getId(): string {
-    return this.config.id;
+  async initialize(): Promise<void> {
+    await this.onInitialize();
+    this._initialized = true;
   }
 
-  /** Human-readable label. */
+  /** Subclass-specific initialisation logic. */
+  protected abstract onInitialize(): Promise<void>;
+
+  /**
+   * Execute the agent's primary action.
+   *
+   * @param context - Execution context (project, session, …).
+   * @param input   - Optional agent-specific input payload.
+   */
+  abstract execute<T>(context: AgentContext, input?: unknown): Promise<AgentResult<T>>;
+
+  /** Returns `true` after `initialize()` has completed successfully. */
+  isInitialized(): boolean {
+    return this._initialized;
+  }
+
   getName(): string {
-    return this.config.name;
+    return this.name;
   }
 
-  /** Current lifecycle state. */
-  getStatus(): AgentStatus {
-    return this._status;
+  getVersion(): string {
+    return this.version;
   }
 
-  // ---------------------------------------------------------------------------
-  // Protected helpers
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Transition to a new status and emit a `status` event so listeners can react.
-   */
-  protected setStatus(status: AgentStatus): void {
-    this._status = status;
-    this.emit('status', status);
+  getDescription(): string {
+    return this.description;
   }
 
-  /**
-   * Emit a `log` event with a plain-text message.
-   * Prefer this over `console.log` so callers can route output as needed.
-   */
-  protected log(message: string): void {
-    this.emit('log', message);
+  /** Helper for subclasses to build a successful result. */
+  protected success<T>(data: T): AgentResult<T> {
+    return { success: true, data, timestamp: new Date() };
+  }
+
+  /** Helper for subclasses to build a failed result. */
+  protected failure<T>(error: string): AgentResult<T> {
+    return { success: false, error, timestamp: new Date() };
   }
 }
