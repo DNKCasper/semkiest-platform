@@ -2,17 +2,22 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  rootDir: 'src',
-  testMatch: ['**/*.test.ts'],
-  moduleNameMapper: {
-    '^@semkiest/db$': '<rootDir>/../../../packages/db/src/index.ts',
-    '^@semkiest/shared-config$': '<rootDir>/../../../packages/shared-config/src/index.ts',
-  },
-  transform: {
-    '^.+\\.tsx?$': ['ts-jest', { tsconfig: '../tsconfig.json' }],
-  },
-  collectCoverageFrom: ['**/*.ts', '!**/*.test.ts', '!**/index.ts'],
+  roots: ['<rootDir>/src'],
+  testMatch: ['**/__tests__/**/*.test.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts'],
+  coverageDirectory: 'coverage',
   coverageThreshold: {
-    global: { lines: 80, functions: 80, branches: 70 },
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+  },
+  moduleNameMapper: {
+    '^@semkiest/db$': '<rootDir>/../../packages/db/src/index.ts',
+    '^@semkiest/shared-types$': '<rootDir>/../../packages/shared-types/src/index.ts',
+    '^@semkiest/shared-utils$': '<rootDir>/../../packages/shared-utils/src/index.ts',
+    '^@semkiest/shared-config$': '<rootDir>/../../packages/shared-config/src/index.ts',
   },
 };

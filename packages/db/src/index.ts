@@ -1,15 +1,22 @@
 import { PrismaClient } from '@prisma/client';
 
-export * from '@prisma/client';
-
-// Singleton pattern — reuse client across hot-reloads in development
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-
-export const prisma: PrismaClient =
-  globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
+// Singleton pattern: reuse connection in dev (prevents hot-reload exhaustion)
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined;
 }
 
-export default prisma;
+export const prisma =
+  global.__prisma ??
+  new PrismaClient({
+    log:
+      process.env['NODE_ENV'] === 'development'
+        ? ['query', 'warn', 'error']
+        : ['warn', 'error'],
+  });
+
+if (process.env['NODE_ENV'] !== 'production') {
+  global.__prisma = prisma;
+}
+
+export type { Prisma, Organization, ScoringConfig, Project, QualityScore } from '@prisma/client';

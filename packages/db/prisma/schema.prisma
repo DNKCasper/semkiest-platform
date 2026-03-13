@@ -1,5 +1,5 @@
-// Prisma schema for SemkiEst platform
-// SEM-99: Advanced Test Profile Configuration
+// Prisma schema for SemkiEst Platform
+// Database: PostgreSQL
 
 generator client {
   provider = "prisma-client-js"
@@ -11,94 +11,87 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ---------------------------------------------------------------------------
-// Project model (from SEM-63 / SEM-37 dependency)
-// ---------------------------------------------------------------------------
+// ─── Organization ────────────────────────────────────────────────────────────
+
+model Organization {
+  id            String         @id @default(uuid())
+  name          String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  scoringConfig ScoringConfig?
+  projects      Project[]
+
+  @@map("organizations")
+}
+
+// ─── Scoring Configuration ────────────────────────────────────────────────────
+
+/// Per-organization scoring weight configuration.
+/// Weights must sum to 1.0. Default weights are applied when not customized.
+model ScoringConfig {
+  id                  String       @id @default(uuid())
+  organizationId      String       @unique
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Scoring weights (must sum to 1.0)
+  functionalWeight    Float        @default(0.30)
+  visualWeight        Float        @default(0.20)
+  performanceWeight   Float        @default(0.20)
+  accessibilityWeight Float        @default(0.10)
+  securityWeight      Float        @default(0.10)
+  apiWeight           Float        @default(0.10)
+
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@map("scoring_configs")
+}
+
+// ─── Project ──────────────────────────────────────────────────────────────────
 
 model Project {
-  id          String        @id @default(uuid())
-  name        String
-  description String?
-  urls        String[]
-  environment String        @default("development")
-  status      String        @default("active")
-  tags        String[]
-  owner       String?
-  team        String?
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  lastRunAt   DateTime?     @map("last_run_at")
-  profiles    Profile[]
+  id             String         @id @default(uuid())
+  name           String
+  team           String?
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  qualityScores  QualityScore[]
 
   @@map("projects")
 }
 
-// ---------------------------------------------------------------------------
-// Profile model
-// SEM-99: test profiles with scheduling, notifications, and auto-triggering
-// ---------------------------------------------------------------------------
+// ─── Quality Score ────────────────────────────────────────────────────────────
 
-model Profile {
-  id          String   @id @default(uuid())
-  projectId   String   @map("project_id")
-  name        String
-  description String?
-  isDefault   Boolean  @default(false) @map("is_default")
-  isTemplate  Boolean  @default(false) @map("is_template")
+/// Immutable snapshot of a project's quality score at a point in time.
+/// Used for trend calculation and historical analysis.
+model QualityScore {
+  id                    String   @id @default(uuid())
+  projectId             String
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  /// ProfileTemplateType: smoke-test | full-regression | performance-only | accessibility-audit
-  templateType String? @map("template_type")
+  /// Composite weighted score (0–100)
+  score                 Float
 
-  /// Array of tag strings for organisation and search
-  tags String[]
+  /// Pass rates per category (null means category not tested)
+  functionalPassRate    Float?
+  visualPassRate        Float?
+  performancePassRate   Float?
+  accessibilityPassRate Float?
+  securityPassRate      Float?
+  apiPassRate           Float?
 
-  /// TestCategoryConfig JSON: { smoke, regression, performance, accessibility }
-  testCategories Json @map("test_categories")
+  /// Badge assigned based on score threshold
+  badge                 String   // excellent | good | needs_attention | critical
 
-  /// Standard cron expression (5 fields), e.g. "0 2 * * *"
-  cronExpression String? @map("cron_expression")
+  /// Score trend compared to previous snapshot
+  trend                 String   // improving | declining | stable
 
-  /// NotificationPreferences JSON: { email, slack, webhooks }
-  notificationPreferences Json? @map("notification_preferences")
+  /// Point-in-time when the score was calculated
+  calculatedAt          DateTime @default(now())
+  createdAt             DateTime @default(now())
 
-  /// AutoRunTriggers JSON: { onDeploy, onPullRequest, onSchedule, ... }
-  autoRunTriggers Json? @map("auto_run_triggers")
-
-  /// Monotonically increasing version counter
-  version Int @default(1)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  project  Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  versions ProfileVersion[]
-
-  @@index([projectId])
-  @@index([isDefault])
-  @@index([templateType])
-  @@index([tags])
-  @@map("profiles")
-}
-
-// ---------------------------------------------------------------------------
-// ProfileVersion model — immutable history snapshots
-// ---------------------------------------------------------------------------
-
-model ProfileVersion {
-  id        String   @id @default(uuid())
-  profileId String   @map("profile_id")
-  version   Int
-
-  /// Full snapshot of the profile's mutable fields at this version
-  settings Json
-
-  changedBy  String?  @map("changed_by")
-  changeNote String?  @map("change_note")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@unique([profileId, version])
-  @@index([profileId])
-  @@map("profile_versions")
+  @@index([projectId, calculatedAt(sort: Desc)])
+  @@map("quality_scores")
 }
