@@ -7,10 +7,14 @@ import type {
   ApiError,
 } from '../types/project';
 import type {
-  TestRun,
-  RunListResponse,
-  RunQueryParams,
-} from '../types/run';
+  Report,
+  ReportListResponse,
+  GenerateReportInput,
+  ScheduleConfig,
+  CreateScheduleInput,
+  UpdateScheduleInput,
+  OrgReportResponse,
+} from '../types/report';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -101,34 +105,62 @@ export const projectsApi = {
   },
 };
 
-/** Test run API methods */
-export const runsApi = {
-  /** GET /api/projects/:projectId/runs */
-  list(projectId: string, params: RunQueryParams = {}): Promise<RunListResponse> {
-    const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== '');
-    const qs = entries.length > 0
-      ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString()}`
-      : '';
-    return request<RunListResponse>(`/api/projects/${projectId}/runs${qs}`);
+/** Reports API methods */
+export const reportsApi = {
+  /** GET /api/projects/:projectId/reports */
+  list(projectId: string, page = 1, pageSize = 20): Promise<ReportListResponse> {
+    return request<ReportListResponse>(
+      `/api/projects/${projectId}/reports?page=${page}&pageSize=${pageSize}`,
+    );
   },
 
-  /** GET /api/projects/:projectId/runs/:runId */
-  get(projectId: string, runId: string): Promise<TestRun> {
-    return request<TestRun>(`/api/projects/${projectId}/runs/${runId}`);
+  /** GET /api/reports/:id */
+  get(id: string): Promise<Report> {
+    return request<Report>(`/api/reports/${id}`);
   },
 
-  /** POST /api/projects/:projectId/runs */
-  trigger(projectId: string): Promise<TestRun> {
-    return request<TestRun>(`/api/projects/${projectId}/runs`, {
+  /** POST /api/projects/:projectId/reports */
+  generate(input: GenerateReportInput): Promise<Report> {
+    return request<Report>(`/api/projects/${input.projectId}/reports`, {
       method: 'POST',
+      body: JSON.stringify(input),
     });
   },
 
-  /** POST /api/projects/:projectId/runs/:runId/cancel */
-  cancel(projectId: string, runId: string): Promise<TestRun> {
-    return request<TestRun>(`/api/projects/${projectId}/runs/${runId}/cancel`, {
-      method: 'POST',
+  /** DELETE /api/reports/:id */
+  delete(id: string): Promise<void> {
+    return request<void>(`/api/reports/${id}`, { method: 'DELETE' });
+  },
+
+  /** GET /api/projects/:projectId/reports/schedules */
+  listSchedules(projectId: string): Promise<ScheduleConfig[]> {
+    return request<ScheduleConfig[]>(`/api/projects/${projectId}/reports/schedules`);
+  },
+
+  /** POST /api/projects/:projectId/reports/schedules */
+  createSchedule(input: CreateScheduleInput): Promise<ScheduleConfig> {
+    return request<ScheduleConfig>(
+      `/api/projects/${input.projectId}/reports/schedules`,
+      { method: 'POST', body: JSON.stringify(input) },
+    );
+  },
+
+  /** PUT /api/reports/schedules/:id */
+  updateSchedule(id: string, input: UpdateScheduleInput): Promise<ScheduleConfig> {
+    return request<ScheduleConfig>(`/api/reports/schedules/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
     });
+  },
+
+  /** DELETE /api/reports/schedules/:id */
+  deleteSchedule(id: string): Promise<void> {
+    return request<void>(`/api/reports/schedules/${id}`, { method: 'DELETE' });
+  },
+
+  /** GET /api/admin/reports/org */
+  getOrgReport(): Promise<OrgReportResponse> {
+    return request<OrgReportResponse>('/api/admin/reports/org');
   },
 };
 
