@@ -1,0 +1,221 @@
+import { buildTestSummaryComment, buildErrorComment } from './comment-builder.js';
+import type { TestRunResult } from './types.js';
+
+function makeResult(overrides: Partial<TestRunResult> = {}): TestRunResult {
+  return {
+    runId: 'run-abc123',
+    projectId: 'proj-xyz',
+    status: 'passed',
+    testProfile: null,
+    summary: {
+      total: 50,
+      passed: 48,
+      failed: 2,
+      skipped: 0,
+      durationMs: 12_500,
+    },
+    reportUrl: 'https://semkiest.io/reports/run-abc123',
+    startedAt: '2024-01-15T10:00:00.000Z',
+    completedAt: '2024-01-15T10:00:12.500Z',
+    createdAt: '2024-01-15T09:59:59.000Z',
+    ...overrides,
+  };
+}
+
+describe('buildTestSummaryComment', () => {
+  it('includes run ID and project ID', () => {
+    const comment = buildTestSummaryComment(makeResult());
+    expect(comment).toContain('`run-abc123`');
+    expect(comment).toContain('`proj-xyz`');
+  });
+
+  it('shows passed status label for passed run', () => {
+    const comment = buildTestSummaryComment(makeResult({ status: 'passed' }));
+    expect(comment).toContain('Tests Passed');
+    expect(comment).not.toContain('Tests Failed');
+  });
+
+  it('shows failed status label for failed run', () => {
+    const comment = buildTestSummaryComment(makeResult({ status: 'failed' }));
+    expect(comment).toContain('Tests Failed');
+    expect(comment).not.toContain('Tests Passed');
+  });
+
+  it('includes test profile when provided', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({ testProfile: 'smoke-tests' }),
+    );
+    expect(comment).toContain('`smoke-tests`');
+  });
+
+  it('omits profile line when testProfile is null', () => {
+    const comment = buildTestSummaryComment(makeResult({ testProfile: null }));
+    expect(comment).not.toContain('**Profile:**');
+  });
+
+  it('includes summary table with correct counts', () => {
+    const comment = buildTestSummaryComment(makeResult());
+    expect(comment).toContain('**48**');
+    expect(comment).toContain('**2**');
+    expect(comment).toContain('**50**');
+  });
+
+  it('calculates pass rate correctly', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({
+        summary: {
+          total: 10,
+          passed: 7,
+          failed: 3,
+          skipped: 0,
+          durationMs: 1000,
+        },
+      }),
+    );
+    expect(comment).toContain('**70%**');
+  });
+
+  it('shows 0% pass rate when total is 0', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({
+        summary: {
+          total: 0,
+          passed: 0,
+          failed: 0,
+          skipped: 0,
+          durationMs: 0,
+        },
+      }),
+    );
+    expect(comment).toContain('**0%**');
+  });
+
+  it('formats duration in seconds for values < 60s', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({
+        summary: {
+          total: 5,
+          passed: 5,
+          failed: 0,
+          skipped: 0,
+          durationMs: 12_500,
+        },
+      }),
+    );
+    expect(comment).toContain('12.5s');
+  });
+
+  it('formats duration in minutes for values >= 60s', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({
+        summary: {
+          total: 5,
+          passed: 5,
+          failed: 0,
+          skipped: 0,
+          durationMs: 125_000,
+        },
+      }),
+    );
+    expect(comment).toContain('2m');
+  });
+
+  it('formats duration in ms for values < 1s', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({
+        summary: {
+          total: 1,
+          passed: 1,
+          failed: 0,
+          skipped: 0,
+          durationMs: 500,
+        },
+      }),
+    );
+    expect(comment).toContain('500ms');
+  });
+
+  it('includes report URL link when reportUrl is present', () => {
+    const comment = buildTestSummaryComment(makeResult());
+    expect(comment).toContain('https://semkiest.io/reports/run-abc123');
+  });
+
+  it('omits report link when reportUrl is null', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({ reportUrl: null }),
+    );
+    expect(comment).not.toContain('View Full Report');
+  });
+
+  it('includes error details when summary has errorMessage', () => {
+    const comment = buildTestSummaryComment(
+      makeResult({
+        status: 'failed',
+        summary: {
+          total: 10,
+          passed: 5,
+          failed: 5,
+          skipped: 0,
+          durationMs: 3000,
+          errorMessage: 'Connection refused: DB is unavailable',
+        },
+      }),
+    );
+    expect(comment).toContain('Error Details');
+    expect(comment).toContain('Connection refused: DB is unavailable');
+  });
+
+  it('omits error section when no errorMessage', () => {
+    const comment = buildTestSummaryComment(makeResult());
+    expect(comment).not.toContain('Error Details');
+  });
+
+  it('includes SemkiEst attribution footer', () => {
+    const comment = buildTestSummaryComment(makeResult());
+    expect(comment).toContain('Generated by');
+    expect(comment).toContain('SemkiEst');
+  });
+
+  it('omits summary table when summary is null', () => {
+    const comment = buildTestSummaryComment(makeResult({ summary: null }));
+    expect(comment).not.toContain('### Summary');
+  });
+});
+
+describe('buildErrorComment', () => {
+  it('includes run ID', () => {
+    const comment = buildErrorComment('run-xyz', 'cancelled');
+    expect(comment).toContain('`run-xyz`');
+  });
+
+  it('shows cancelled message for cancelled status', () => {
+    const comment = buildErrorComment('run-1', 'cancelled');
+    expect(comment).toContain('Cancelled');
+  });
+
+  it('shows timeout message for timeout status', () => {
+    const comment = buildErrorComment('run-1', 'timeout');
+    expect(comment).toContain('Timed Out');
+  });
+
+  it('shows error message for error status', () => {
+    const comment = buildErrorComment('run-1', 'error');
+    expect(comment).toContain('Error');
+  });
+
+  it('includes error details when provided', () => {
+    const comment = buildErrorComment('run-1', 'error', 'Network timeout');
+    expect(comment).toContain('Network timeout');
+    expect(comment).toContain('Details');
+  });
+
+  it('omits details section when no errorMessage provided', () => {
+    const comment = buildErrorComment('run-1', 'cancelled');
+    expect(comment).not.toContain('Details');
+  });
+
+  it('includes attribution footer', () => {
+    const comment = buildErrorComment('run-1', 'error');
+    expect(comment).toContain('Generated by');
+  });
+});
