@@ -1,3 +1,6 @@
+// Prisma schema for SemkiEst Platform
+// Database: PostgreSQL
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,95 +11,179 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── Data Library Models ──────────────────────────────────────────────────────
+// ─── Organization & Project ──────────────────────────────────────────────────
 
-/**
- * Per-project persistent data library. Each project has at most one library.
- */
-model DataLibrary {
-  id          String    @id @default(cuid())
-  projectId   String    @unique
-  name        String
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  dataSets    DataSet[]
+  projects   Project[]
+  thresholds QualityThreshold[]
 
-  @@index([projectId])
+  @@map("organizations")
 }
 
-/**
- * Supported import formats for test data.
- */
-enum DataFormat {
-  CSV
-  JSON
-  SQL
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  testRuns          TestRun[]
+  dailyMetrics      DailyQualityMetric[]
+  regressionAlerts  RegressionAlert[]
+  thresholds        QualityThreshold[]
+
+  @@index([organizationId])
+  @@map("projects")
 }
 
-/**
- * Audit actions tracked for all data operations.
- */
-enum AuditAction {
-  LIBRARY_CREATE
-  DATASET_IMPORT
-  DATASET_VERSION_CREATE
-  DATASET_TAG
-  DATASET_BASELINE_SET
-  DATASET_ROLLBACK
-  CLEANUP_EXECUTE
-  CLEANUP_ROLLBACK
+// ─── Raw Test Results ────────────────────────────────────────────────────────
+
+enum TestStatus {
+  PASSED
+  FAILED
+  SKIPPED
+  ERROR
 }
 
-/**
- * A versioned data set within a library. Each version is a separate record.
- * The combination of (libraryId, name, version) is unique.
- */
-model DataSet {
-  id          String      @id @default(cuid())
-  libraryId   String
-  name        String
-  version     Int         @default(1)
-  tags        String[]
-  format      DataFormat
-  /// Serialised data content (rows for CSV/JSON, statements for SQL)
-  content     Json
-  /// SHA-256 hex digest of the raw content string for integrity checks
-  checksum    String
-  /// When true, cleanup service will restore this version as the baseline
-  isBaseline  Boolean     @default(false)
-  createdAt   DateTime    @default(now())
-
-  library     DataLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
-  auditLogs   AuditLog[]
-
-  @@unique([libraryId, name, version])
-  @@index([libraryId])
-  @@index([tags])
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
 }
 
-/**
- * Immutable audit trail for all data-library operations.
- */
-model AuditLog {
-  id        String      @id @default(cuid())
-  projectId String
-  dataSetId String?
-  action    AuditAction
-  /// Free-form identity string (user ID, service name, etc.)
-  actor     String?
-  /// Snapshot of relevant state before the operation
-  before    Json?
-  /// Snapshot of relevant state after the operation
-  after     Json?
-  /// Additional operation metadata
-  metadata  Json?
-  createdAt DateTime    @default(now())
+model TestRun {
+  id          String     @id @default(cuid())
+  projectId   String     @map("project_id")
+  externalId  String?    @map("external_id")  // ID from test runner
+  runAt       DateTime   @map("run_at")
+  timezone    String     @default("UTC")
+  durationMs  Int        @map("duration_ms")
+  totalTests  Int        @map("total_tests")
+  passedTests Int        @map("passed_tests")
+  failedTests Int        @map("failed_tests")
+  skippedTests Int       @map("skipped_tests")
+  errorTests  Int        @default(0) @map("error_tests")
+  bugCount    Int        @default(0) @map("bug_count")
+  coverage    Float?     // percentage 0–100
+  metadata    Json?      // arbitrary runner metadata
+  createdAt   DateTime   @default(now()) @map("created_at")
 
-  dataSet   DataSet?    @relation(fields: [dataSetId], references: [id], onDelete: SetNull)
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bugReports   BugReport[]
 
-  @@index([projectId])
-  @@index([dataSetId])
-  @@index([createdAt])
+  @@index([projectId, runAt])
+  @@index([runAt])
+  @@map("test_runs")
+}
+
+model BugReport {
+  id        String   @id @default(cuid())
+  testRunId String   @map("test_run_id")
+  title     String
+  severity  Severity
+  createdAt DateTime @default(now()) @map("created_at")
+
+  testRun TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId])
+  @@index([severity])
+  @@map("bug_reports")
+}
+
+// ─── Aggregated Quality Metrics ──────────────────────────────────────────────
+
+model DailyQualityMetric {
+  id             String   @id @default(cuid())
+  projectId      String   @map("project_id")
+  metricDate     DateTime @map("metric_date") @db.Date
+  timezone       String   @default("UTC")
+  runCount       Int      @map("run_count")
+  totalTests     Int      @map("total_tests")
+  passedTests    Int      @map("passed_tests")
+  failedTests    Int      @map("failed_tests")
+  skippedTests   Int      @map("skipped_tests")
+  passRate       Float    @map("pass_rate")   // 0.0 – 1.0
+  bugCount       Int      @map("bug_count")
+  criticalBugs   Int      @default(0) @map("critical_bugs")
+  highBugs       Int      @default(0) @map("high_bugs")
+  mediumBugs     Int      @default(0) @map("medium_bugs")
+  lowBugs        Int      @default(0) @map("low_bugs")
+  avgCoverage    Float?   @map("avg_coverage")
+  avgDurationMs  Float?   @map("avg_duration_ms")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, metricDate, timezone])
+  @@index([projectId, metricDate])
+  @@map("daily_quality_metrics")
+}
+
+// ─── Threshold Configuration ─────────────────────────────────────────────────
+
+model QualityThreshold {
+  id                  String   @id @default(cuid())
+  organizationId      String?  @map("organization_id")
+  projectId           String?  @map("project_id")  // null = org-level default
+  minPassRate         Float    @default(0.8) @map("min_pass_rate")
+  maxBugCount         Int?     @map("max_bug_count")
+  maxCriticalBugs     Int      @default(0) @map("max_critical_bugs")
+  minCoverage         Float?   @map("min_coverage")
+  regressionSensitivity Float  @default(2.0) @map("regression_sensitivity") // stddev multiplier
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, projectId])
+  @@map("quality_thresholds")
+}
+
+// ─── Regression Alerts ───────────────────────────────────────────────────────
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum AlertType {
+  PASS_RATE_DROP
+  BUG_COUNT_SPIKE
+  COVERAGE_DROP
+  STATISTICAL_DEVIATION
+}
+
+model RegressionAlert {
+  id              String      @id @default(cuid())
+  projectId       String      @map("project_id")
+  alertType       AlertType   @map("alert_type")
+  status          AlertStatus @default(OPEN)
+  detectedAt      DateTime    @map("detected_at")
+  resolvedAt      DateTime?   @map("resolved_at")
+  metricDate      DateTime    @map("metric_date") @db.Date
+  currentValue    Float       @map("current_value")
+  baselineValue   Float       @map("baseline_value")
+  threshold       Float
+  deviation       Float       // how many stddevs or % below threshold
+  message         String
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, detectedAt])
+  @@index([status])
+  @@map("regression_alerts")
 }

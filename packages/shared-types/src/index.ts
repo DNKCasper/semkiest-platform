@@ -1,4 +1,4 @@
 // Shared TypeScript types for the SemkiEst platform.
-// Type definitions will be added here as the platform develops.
+// Domain-specific types are exported from this package.
 
-export {};
+export type { TrendDataPoint, RollingAverage, QualityTrendReport, TrendWindow } from './quality';
