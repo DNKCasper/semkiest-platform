@@ -1,190 +1,118 @@
-import type { AgentConfig } from '@semkiest/agent-base';
-
-// ---------------------------------------------------------------------------
-// User flow input types
-// ---------------------------------------------------------------------------
-
-/** Supported HTTP methods for a flow step. */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-
 /**
- * A single HTTP request within a user flow.
+ * Shared types for the Load Testing Agent.
+ * Covers configuration, raw k6 metrics, and structured results for
+ * stress testing, soak testing, and report generation.
  */
-export interface UserFlowStep {
-  /** HTTP method to use. */
-  method: HttpMethod;
-  /** Full URL or path (resolved against `LoadConfig.baseUrl` when relative). */
+
+// ---------------------------------------------------------------------------
+// Base configuration
+// ---------------------------------------------------------------------------
+
+/** HTTP methods supported for load test requests */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD';
+
+/** A single HTTP endpoint to target during load testing */
+export interface LoadTestEndpoint {
+  /** Full URL of the endpoint */
   url: string;
-  /** Optional JSON request body. Serialised to JSON automatically. */
-  body?: Record<string, unknown>;
-  /** Additional HTTP headers to send with this step. */
+  /** HTTP method (default: GET) */
+  method?: HttpMethod;
+  /** Optional request body (for POST/PUT/PATCH) */
+  body?: string;
+  /** Optional request headers */
   headers?: Record<string, string>;
-  /** HTTP status code expected for the check assertion. Defaults to 200. */
-  expectedStatus?: number;
-  /** k6 tags applied to metrics for this step (e.g. for filtering in dashboards). */
-  tags?: Record<string, string>;
+  /** Wait between iterations in seconds (default: 1) */
+  sleepSeconds?: number;
 }
 
-/**
- * A named sequence of HTTP steps that models one user journey.
- */
-export interface UserFlow {
-  /** Identifier used as a k6 function name (must be a valid JS identifier). */
+/** Performance thresholds used to determine pass/fail */
+export interface PerformanceThresholds {
+  /** Maximum allowed p95 response time in milliseconds (default: 2000) */
+  maxP95ResponseTimeMs: number;
+  /** Maximum allowed p99 response time in milliseconds (default: 5000) */
+  maxP99ResponseTimeMs: number;
+  /** Maximum allowed error rate as a fraction 0–1 (default: 0.05) */
+  maxErrorRate: number;
+  /** Minimum required requests per second (default: 1) */
+  minThroughputRps: number;
+}
+
+/** Common base for all load test configurations */
+export interface BaseLoadTestConfig {
+  /** Human-readable name for this test run */
   name: string;
-  /** Steps executed in order for this flow. */
-  steps: UserFlowStep[];
-  /**
-   * Think-time in milliseconds inserted between steps.
-   * Converted to `sleep(thinkTime / 1000)` in the generated script.
-   * Defaults to 1000 ms.
-   */
-  thinkTime?: number;
-  /**
-   * Relative weight used for traffic distribution when multiple flows are
-   * included. Higher numbers get proportionally more executions.
-   * Defaults to 1.
-   */
-  weight?: number;
+  /** One or more endpoints to test */
+  endpoints: LoadTestEndpoint[];
+  /** Performance thresholds to compare results against */
+  thresholds: PerformanceThresholds;
+  /** Directory for storing k6 scripts and raw output files */
+  outputDir: string;
+  /** Path to the k6 binary (default: 'k6') */
+  k6BinaryPath?: string;
 }
 
 // ---------------------------------------------------------------------------
-// Load configuration
+// Stress test configuration
 // ---------------------------------------------------------------------------
 
-/**
- * One stage in a VU ramp pattern.
- */
-export interface LoadStage {
-  /** Duration string understood by k6, e.g. `"30s"`, `"2m"`, `"1h"`. */
-  duration: string;
-  /** Target number of virtual users at the end of this stage. */
-  target: number;
+/** A single stage in a stress test ramp-up sequence */
+export interface StressStage {
+  /** Target number of virtual users at the end of this stage */
+  targetVus: number;
+  /** How long to ramp up to targetVus (e.g., '30s', '1m', '2m') */
+  rampUpDuration: string;
+  /** How long to hold at targetVus after ramping up */
+  holdDuration: string;
 }
 
-/**
- * Configures how load is applied during a test run.
- */
-export interface LoadConfig {
+/** Configuration for a stress test run */
+export interface StressTestConfig extends BaseLoadTestConfig {
+  /** Ordered list of stages; each stage increases load */
+  stages: StressStage[];
   /**
-   * Constant number of virtual users when no `stages` are specified.
-   * Ignored when `stages` is provided.
-   * Defaults to 10.
+   * Error rate fraction (0–1) that indicates the breaking point.
+   * The first stage that exceeds this rate is flagged as the breaking point.
+   * Default: 0.1 (10%)
    */
-  virtualUsers?: number;
+  breakingPointErrorRateThreshold: number;
   /**
-   * Total test duration when no `stages` are specified, e.g. `"30s"`, `"5m"`.
-   * Ignored when `stages` is provided.
-   * Defaults to `"30s"`.
+   * p95 latency in ms that indicates the breaking point.
+   * Default: 5000 ms
    */
-  duration?: string;
-  /**
-   * Ramping stages. When provided, `virtualUsers` and `duration` are ignored.
-   * A common pattern is ramp-up → steady-state → ramp-down.
-   */
-  stages?: LoadStage[];
-  /**
-   * Convenience alias: duration of the ramp-up stage.
-   * Generates a three-stage pattern (rampUp → steady at `virtualUsers` for
-   * `duration` → rampDown) when `stages` is omitted.
-   */
-  rampUp?: string;
-  /**
-   * Convenience alias: duration of the ramp-down stage.
-   * See `rampUp` for usage context.
-   */
-  rampDown?: string;
-  /**
-   * Base URL prepended to any relative `url` in a flow step.
-   * e.g. `"https://api.example.com"`.
-   */
-  baseUrl?: string;
-  /** Threshold values applied to the generated k6 options. */
-  thresholds?: LoadThresholds;
-}
-
-/**
- * Pass/fail thresholds applied to the k6 run.
- */
-export interface LoadThresholds {
-  /** p95 response time limit in milliseconds. Defaults to 2000. */
-  httpReqDurationP95?: number;
-  /** Maximum acceptable error rate as a fraction (0–1). Defaults to 0.1. */
-  httpReqFailedRate?: number;
+  breakingPointLatencyMs: number;
 }
 
 // ---------------------------------------------------------------------------
-// Metrics types
+// Soak test configuration
 // ---------------------------------------------------------------------------
 
-/**
- * Percentile breakdown for a timing metric (all values in milliseconds).
- */
-export interface PercentileMetrics {
-  p50: number;
-  p90: number;
-  p95: number;
-  p99: number;
-  min: number;
-  max: number;
-  avg: number;
-}
-
-/** Counter-style throughput metrics. */
-export interface ThroughputMetrics {
-  /** Total request count over the test run. */
-  count: number;
-  /** Requests per second averaged over the test run. */
-  rate: number;
-}
-
-/** Error rate summary. */
-export interface ErrorMetrics {
-  /** Fraction of failed requests (0–1). */
-  rate: number;
-  /** Absolute count of failed requests. */
-  count: number;
-}
-
-/** Virtual user gauge metrics. */
-export interface VuMetrics {
-  /** VU count at the end of the test. */
-  current: number;
-  /** Peak VU count observed during the test. */
-  max: number;
-}
-
-/**
- * Aggregated load test metrics produced by `MetricsCollector`.
- */
-export interface LoadTestMetrics {
-  httpReqDuration: PercentileMetrics;
-  httpReqs: ThroughputMetrics;
-  httpReqFailed: ErrorMetrics;
-  vus: VuMetrics;
-  /** Total completed iterations. */
-  iterations: number;
-  /** Time the metrics snapshot was taken. */
-  timestamp: Date;
+/** Configuration for a soak test run */
+export interface SoakTestConfig extends BaseLoadTestConfig {
+  /** Number of virtual users to sustain throughout the test */
+  virtualUsers: number;
+  /** How long to ramp up to virtualUsers (e.g., '2m') */
+  rampUpDuration: string;
+  /** How long to hold at virtualUsers (e.g., '1h') */
+  holdDuration: string;
+  /** How long to ramp down from virtualUsers (e.g., '2m') */
+  rampDownDuration: string;
+  /**
+   * Sampling interval for metric snapshots in seconds.
+   * Snapshots are used to detect degradation trends. Default: 30
+   */
+  snapshotIntervalSeconds: number;
+  /**
+   * Percentage increase in p95 response time over the test duration that
+   * constitutes a memory-leak / degradation signal (default: 20%).
+   */
+  degradationThresholdPercent: number;
 }
 
 // ---------------------------------------------------------------------------
-// k6 output types
+// Raw k6 output types
 // ---------------------------------------------------------------------------
 
-/** A single metric definition entry in a k6 JSON output stream. */
-export interface K6MetricDefinition {
-  type: 'Metric';
-  metric: string;
-  data: {
-    name: string;
-    type: string;
-    contains: string;
-    thresholds: string[];
-    submetrics: null | string[];
-  };
-}
-
-/** A single data point in a k6 JSON output stream. */
+/** A single data point from the k6 JSON output stream */
 export interface K6DataPoint {
   type: 'Point';
   metric: string;
@@ -195,81 +123,224 @@ export interface K6DataPoint {
   };
 }
 
-/** Union of entries in a k6 JSON output stream. */
-export type K6OutputLine = K6MetricDefinition | K6DataPoint;
-
-/** Shape of a k6 summary export JSON file (`--summary-export`). */
-export interface K6Summary {
-  metrics: Record<string, K6SummaryMetric>;
+/** A metric definition from the k6 JSON output stream */
+export interface K6MetricDefinition {
+  type: 'Metric';
+  metric: string;
+  data: {
+    name: string;
+    type: 'counter' | 'gauge' | 'rate' | 'trend';
+    contains: string;
+    thresholds: string[];
+    submetrics: null | string[];
+  };
 }
 
-/** One metric entry inside a k6 summary export. */
-export interface K6SummaryMetric {
-  type: string;
+/** Union of all possible k6 JSON output line types */
+export type K6OutputLine = K6DataPoint | K6MetricDefinition;
+
+/** Aggregated metric values from the k6 summary export */
+export interface K6MetricSummary {
+  type: 'counter' | 'gauge' | 'rate' | 'trend';
   contains: string;
   values: Record<string, number>;
-  thresholds?: Record<string, { ok: boolean }>;
+}
+
+/** Full k6 summary JSON structure */
+export interface K6Summary {
+  metrics: Record<string, K6MetricSummary>;
+  root_group: {
+    name: string;
+    path: string;
+    id: string;
+    groups: unknown[];
+    checks: Array<{
+      name: string;
+      path: string;
+      id: string;
+      passes: number;
+      fails: number;
+    }>;
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Executor types
+// Per-stage metrics (used internally by stress / soak testers)
 // ---------------------------------------------------------------------------
 
-/** Options for a single k6 execution. */
-export interface K6ExecutionOptions {
-  /** Absolute path where the JSON output stream should be written. */
-  outputPath?: string;
-  /** Absolute path for the summary export JSON file. */
-  summaryExportPath?: string;
-  /** Extra environment variables forwarded to the k6 process. */
-  env?: Record<string, string>;
-  /** Process timeout in milliseconds. Defaults to 10 minutes. */
-  timeout?: number;
+/** Aggregated metrics collected for a single time window or stage */
+export interface StageMetrics {
+  /** Wall-clock start of this window (ISO string) */
+  windowStart: string;
+  /** Wall-clock end of this window (ISO string) */
+  windowEnd: string;
+  /** Average response time in ms */
+  avgResponseTimeMs: number;
+  /** 50th-percentile response time in ms */
+  p50ResponseTimeMs: number;
+  /** 95th-percentile response time in ms */
+  p95ResponseTimeMs: number;
+  /** 99th-percentile response time in ms */
+  p99ResponseTimeMs: number;
+  /** Minimum response time in ms */
+  minResponseTimeMs: number;
+  /** Maximum response time in ms */
+  maxResponseTimeMs: number;
+  /** Total requests made in this window */
+  totalRequests: number;
+  /** Requests per second in this window */
+  requestsPerSecond: number;
+  /** Error rate as a fraction 0–1 */
+  errorRate: number;
+  /** Number of virtual users at the end of this window */
+  virtualUsers: number;
 }
 
-/** Raw result returned by `K6Executor.execute()`. */
-export interface K6ExecutionResult {
-  /** k6 process exit code (0 = pass, 99 = threshold failure, other = error). */
-  exitCode: number;
-  /** Wall-clock duration of the k6 process in milliseconds. */
-  duration: number;
-  /** Absolute path to the script file that was executed. */
-  scriptPath: string;
-  /** Absolute path to the summary export (may not exist on error). */
-  summaryPath: string | undefined;
-  /** Combined stdout + stderr captured from the k6 process. */
-  rawOutput: string;
-  /** Temp directory that holds all generated artefacts. */
-  tmpDir: string;
+// ---------------------------------------------------------------------------
+// Stress test result
+// ---------------------------------------------------------------------------
+
+/** Per-stage summary during a stress test */
+export interface StressStageResult {
+  /** Stage index (0-based) */
+  stageIndex: number;
+  /** Configuration used for this stage */
+  config: StressStage;
+  /** Aggregated metrics recorded during the hold phase */
+  metrics: StageMetrics;
+  /** Whether this stage exceeded breaking-point thresholds */
+  isBreakingPoint: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Load agent config / result
-// ---------------------------------------------------------------------------
-
-/** Configuration for `LoadAgent`. */
-export interface LoadAgentConfig extends AgentConfig {
-  /** One or more user flows to generate and execute. */
-  flows: UserFlow[];
-  /** Controls virtual user counts, durations, and ramp patterns. */
-  loadConfig: LoadConfig;
+/** Full result from a stress test run */
+export interface StressTestResult {
+  /** Test name from config */
+  name: string;
+  /** ISO timestamp of when the test started */
+  startedAt: string;
+  /** ISO timestamp of when the test finished */
+  finishedAt: string;
+  /** Total duration in milliseconds */
+  durationMs: number;
+  /** Results for every stage executed */
+  stages: StressStageResult[];
   /**
-   * Path (or name) of the k6 binary.
-   * Defaults to `"k6"` (relies on PATH).
+   * Index of the stage identified as the breaking point, or null if the
+   * system handled all stages within thresholds.
    */
-  k6Binary?: string;
+  breakingPointStageIndex: number | null;
+  /** Maximum sustainable VU count before breaking */
+  maxSustainableVus: number;
+  /** Overall metrics from the entire test run (k6 summary) */
+  overallMetrics: K6MetricSummary;
+  /** Whether the test passed all configured thresholds */
+  passed: boolean;
+  /** Human-readable summary of findings */
+  summary: string;
 }
 
-/** Final result produced by a successful `LoadAgent.run()`. */
-export interface LoadTestResult {
-  /** Aggregated metrics parsed from the k6 summary export. */
-  metrics: LoadTestMetrics;
-  /** k6 process exit code. */
-  exitCode: number;
-  /** Total test wall-clock time in milliseconds. */
-  duration: number;
-  /** Path to the generated k6 script. */
-  scriptPath: string;
-  /** True when exit code is 0 (all thresholds passed). */
-  passed: boolean;
+// ---------------------------------------------------------------------------
+// Soak test result
+// ---------------------------------------------------------------------------
+
+/** A snapshot taken at a point in time during a soak test */
+export interface SoakSnapshot {
+  /** ISO timestamp */
+  timestamp: string;
+  /** Elapsed seconds from the start of the hold phase */
+  elapsedSeconds: number;
+  metrics: StageMetrics;
 }
+
+/** Detected degradation or anomaly pattern during a soak test */
+export interface DegradationPattern {
+  /** Type of degradation detected */
+  type: 'response_time_increase' | 'error_rate_spike' | 'throughput_drop' | 'memory_leak_indicator';
+  /** ISO timestamp when the pattern was first detected */
+  detectedAt: string;
+  /** Elapsed seconds into the hold phase when detected */
+  elapsedSeconds: number;
+  /** Human-readable description of the pattern */
+  description: string;
+  /** Baseline value at the start of the hold phase */
+  baselineValue: number;
+  /** Observed value when the pattern was detected */
+  observedValue: number;
+  /** Percentage change from baseline */
+  changePercent: number;
+}
+
+/** Full result from a soak test run */
+export interface SoakTestResult {
+  /** Test name from config */
+  name: string;
+  /** ISO timestamp of when the test started */
+  startedAt: string;
+  /** ISO timestamp of when the test finished */
+  finishedAt: string;
+  /** Total duration in milliseconds */
+  durationMs: number;
+  /** Metric snapshots collected throughout the hold phase */
+  snapshots: SoakSnapshot[];
+  /** Detected degradation patterns (empty if stable) */
+  degradationPatterns: DegradationPattern[];
+  /** Whether any memory-leak indicators were detected */
+  memoryLeakDetected: boolean;
+  /** Overall metrics from the entire test run (k6 summary) */
+  overallMetrics: K6MetricSummary;
+  /** Whether the test passed all configured thresholds */
+  passed: boolean;
+  /** Human-readable summary of findings */
+  summary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Report generation
+// ---------------------------------------------------------------------------
+
+/** Configuration for report generation */
+export interface ReportConfig {
+  /** Title displayed in the generated report */
+  title: string;
+  /** Directory where the report file will be written */
+  outputDir: string;
+  /** Report file name (without extension, default: 'load-test-report') */
+  fileName?: string;
+  /** Whether to include raw data tables in the report (default: true) */
+  includeRawData?: boolean;
+}
+
+/** A data series for a chart */
+export interface ChartDataSeries {
+  label: string;
+  data: number[];
+  color: string;
+}
+
+/** Data required to render a single chart */
+export interface ChartData {
+  title: string;
+  xAxisLabel: string;
+  yAxisLabel: string;
+  labels: string[];
+  series: ChartDataSeries[];
+}
+
+/** A complete generated load test report */
+export interface LoadTestReport {
+  /** Path to the generated HTML report file */
+  reportPath: string;
+  /** Title of the report */
+  title: string;
+  /** ISO timestamp when the report was generated */
+  generatedAt: string;
+  /** Charts included in the report */
+  charts: ChartData[];
+  /** Whether the overall test passed */
+  passed: boolean;
+  /** High-level findings text */
+  findings: string[];
+}
+
+/** Union type for test results that can be reported on */
+export type AnyTestResult = StressTestResult | SoakTestResult;
