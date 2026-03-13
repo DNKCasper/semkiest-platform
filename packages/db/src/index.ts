@@ -1,9 +1,1 @@
-export { PrismaClient } from '@prisma/client';
-export type {
-  DataLibrary,
-  DataSet,
-  AuditLog,
-  DataFormat,
-  AuditAction,
-  Prisma,
-} from '@prisma/client';
+// Placeholder — database client will be added in future stories

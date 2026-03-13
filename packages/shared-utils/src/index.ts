@@ -1,2 +1,1 @@
-// Shared utility functions — to be populated as the platform grows.
-export {};
+// Placeholder — utilities will be added in future stories

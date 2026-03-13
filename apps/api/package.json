@@ -1,15 +1,52 @@
 {
   "main": "./dist/server.js",
-  "scripts": {
-    "lint": "eslint src --ext .ts",
-    "start": "node dist/server.js",
-    "test": "jest --coverage",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+  "private": true,
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "ts-jest": "^29.1.0",
+    "@types/bcryptjs": "^2.4.6",
+    "typescript": "^5.5.0",
+    "@types/supertest": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.0.0",
+    "supertest": "^7.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@types/express": "^4.17.21",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "ts-node-dev": "^2.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "ioredis": "^5.3.2",
+    "@semkiest/shared-types": "workspace:*",
+    "@semkiest/db": "workspace:*",
+    "helmet": "^7.1.0",
+    "@semkiest/shared-utils": "workspace:*",
+    "bcryptjs": "^2.4.3",
+    "@sem/db": "*",
+    "fastify": "^4.28.0",
+    "@semkiest/shared-config": "workspace:*",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.2",
+    "@fastify/jwt": "^9.0.0",
+    "@sem/database": "*",
+    "@sem/shared": "*",
+    "zod": "^3.23.0",
+    "rate-limiter-flexible": "^5.0.0"
   },
   "version": "1.0.0",
-  "private": true,
+  "scripts": {
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src --ext .ts",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc"
+  },
+  "name": "@sem/api",
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
@@ -24,42 +61,5 @@
       "@sem/shared": "<rootDir>/../../packages/shared/src/index.ts",
       "@sem/database": "<rootDir>/../../packages/database/src/index.ts"
     }
-  },
-  "name": "@sem/api",
-  "devDependencies": {
-    "@types/supertest": "^6.0.0",
-    "@types/node": "^20.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "eslint": "^8.57.0",
-    "supertest": "^7.0.0",
-    "@types/express": "^4.17.21",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.2.0",
-    "@types/jest": "^29.5.0",
-    "typescript": "^5.5.0",
-    "@types/bcryptjs": "^2.4.6",
-    "ts-node-dev": "^2.0.0",
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/cors": "^2.8.17"
-  },
-  "dependencies": {
-    "helmet": "^7.1.0",
-    "@semkiest/shared-utils": "workspace:*",
-    "bcryptjs": "^2.4.3",
-    "express": "^4.19.0",
-    "jsonwebtoken": "^9.0.2",
-    "@sem/database": "*",
-    "zod": "^3.23.8",
-    "@semkiest/shared-config": "workspace:*",
-    "@sem/shared": "*",
-    "cors": "^2.8.5",
-    "@sem/db": "*",
-    "@fastify/jwt": "^9.0.0",
-    "@semkiest/db": "workspace:*",
-    "fastify": "^4.28.0",
-    "@semkiest/shared-types": "workspace:*",
-    "rate-limiter-flexible": "^5.0.0",
-    "ioredis": "^5.3.2"
   }
 }

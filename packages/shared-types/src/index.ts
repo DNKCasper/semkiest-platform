@@ -1,2 +1,1 @@
-// Shared TypeScript types — to be populated as the platform grows.
-export {};
+// Placeholder — types will be added in future stories
