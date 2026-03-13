@@ -22,12 +22,11 @@
   "dependencies": {
     "@semkiest/shared-utils": "workspace:*",
     "cron-parser": "^4.9.0",
-    "@sem/database": "*",
+    "@sem/database": "workspace:*",
     "exceljs": "^4.4.0",
     "express": "^4.19.0",
     "@semkiest/shared-types": "workspace:*",
     "@semkiest/db": "workspace:*",
-    "@sem/db": "*",
     "cors": "^2.8.5",
     "@fastify/jwt": "^9.0.0",
     "ioredis": "^5.3.2",

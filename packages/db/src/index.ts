@@ -19,8 +19,33 @@ if (process.env['NODE_ENV'] !== 'production') {
 export default prisma;
 
 // Re-export Prisma types for convenience
-export { Prisma, ScheduleStatus, RunStatus } from '@prisma/client';
+export {
+  Prisma,
+  // Core domain enums
+  UserRole,
+  TestRunStatus,
+  TestResultStatus,
+  TestStepStatus,
+  // Schedule enums
+  ScheduleStatus,
+  RunStatus,
+} from '@prisma/client';
+
 export type {
+  // Core domain models
+  Organization,
+  User,
+  Project,
+  TestProfile,
+  TestRun,
+  TestResult,
+  TestStep,
+  Screenshot,
+  Baseline,
+  AgentConfig,
+  AiCreditUsage,
+  Notification,
+  // Schedule models
   Schedule,
   ScheduleRun,
 } from '@prisma/client';
