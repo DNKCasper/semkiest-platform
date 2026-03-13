@@ -43,3 +43,9 @@ export {
   parseWorkerEnv,
   type WorkerEnv,
 } from './worker';
+
+export {
+  slackEnvSchema,
+  parseSlackEnv,
+  type SlackEnv,
+} from './slack';

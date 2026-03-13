@@ -44,10 +44,15 @@
       "require": "./dist/env/s3.js",
       "types": "./dist/env/s3.d.ts"
     },
+    "./env/slack": {
+      "import": "./dist/env/slack.js",
+      "require": "./dist/env/slack.js",
+      "types": "./dist/env/slack.d.ts"
+    },
     "./tsconfig/*": "./tsconfig/*.json"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/env/index.ts src/env/api.ts src/env/worker.ts src/env/web.ts src/env/database.ts src/env/redis.ts src/env/s3.ts --format cjs,esm --dts --out-dir dist",
+    "build": "tsup src/index.ts src/env/index.ts src/env/api.ts src/env/worker.ts src/env/web.ts src/env/database.ts src/env/redis.ts src/env/s3.ts src/env/slack.ts --format cjs,esm --dts --out-dir dist",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "eslint src/",
     "test": "jest --passWithNoTests",

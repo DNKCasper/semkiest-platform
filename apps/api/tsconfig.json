@@ -8,7 +8,9 @@
       "@semkiest/shared-types": ["../../packages/shared-types/src"],
       "@semkiest/shared-utils": ["../../packages/shared-utils/src"],
       "@semkiest/shared-config": ["../../packages/shared-config/src"],
-      "@semkiest/db": ["../../packages/db/src"]
+      "@semkiest/shared-config/*": ["../../packages/shared-config/src/*"],
+      "@semkiest/db": ["../../packages/db/src"],
+      "@semkiest/slack-integration": ["../../packages/integrations/slack/src"]
     }
   },
   "include": ["src/**/*.ts"],
