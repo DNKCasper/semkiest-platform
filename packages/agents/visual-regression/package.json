@@ -1,0 +1,32 @@
+{
+  "name": "@semkiest/visual-regression-agent",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@semkiest/agent-base": "workspace:*",
+    "playwright": "^1.45.0"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "typescript": "^5.4.0"
+  }
+}
