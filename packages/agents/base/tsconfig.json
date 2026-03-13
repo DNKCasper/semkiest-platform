@@ -2,15 +2,16 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "include": [
     "src/**/*",
-    "src"
+    "src",
+    "src/**/*.ts"
   ],
   "extends": "../../shared-config/tsconfig/node.json",
   "compilerOptions": {
     "sourceMap": true,
     "declarationMap": true,
-    "rootDir": "src",
-    "outDir": "dist",
+    "rootDir": "./src",
     "composite": true,
+    "outDir": "./dist",
     "declaration": true
   },
   "exclude": [

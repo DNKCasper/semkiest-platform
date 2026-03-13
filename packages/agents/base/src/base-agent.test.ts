@@ -1,114 +1,92 @@
 import { BaseAgent } from './base-agent';
-import type { AgentConfig } from './types';
+import type { AgentConfig, AgentResult } from './types';
 
-// Concrete test implementation
-class EchoAgent extends BaseAgent<AgentConfig, string, string> {
-  protected async executeImpl(input: string): Promise<string> {
-    this.info('Echoing input', { input });
-    return input;
+/** Minimal concrete subclass for testing BaseAgent behaviour. */
+class TestAgent extends BaseAgent<AgentConfig, string> {
+  public initCalled = false;
+  public runCalled = false;
+  public stopCalled = false;
+
+  async initialize(): Promise<void> {
+    this.initCalled = true;
+    this.setStatus('initializing');
+  }
+
+  async run(): Promise<AgentResult<string>> {
+    this.runCalled = true;
+    this.setStatus('running');
+    this.setStatus('stopped');
+    return { success: true, data: 'done', duration: 0 };
+  }
+
+  async stop(): Promise<void> {
+    this.stopCalled = true;
+    this.setStatus('stopping');
+    this.setStatus('stopped');
   }
 }
-
-class FailingAgent extends BaseAgent<AgentConfig, void, void> {
-  protected async executeImpl(): Promise<void> {
-    throw new Error('Intentional failure');
-  }
-}
-
-class SlowAgent extends BaseAgent<AgentConfig, void, void> {
-  protected async executeImpl(): Promise<void> {
-    await new Promise<void>((resolve) => setTimeout(resolve, 5_000));
-  }
-}
-
-const makeConfig = (overrides: Partial<AgentConfig> = {}): AgentConfig => ({
-  id: 'test-agent',
-  name: 'Test Agent',
-  ...overrides,
-});
 
 describe('BaseAgent', () => {
-  describe('run()', () => {
-    it('returns success result when executeImpl resolves', async () => {
-      const agent = new EchoAgent(makeConfig());
-      const result = await agent.run('hello');
-
-      expect(result.success).toBe(true);
-      expect(result.data).toBe('hello');
-      expect(result.error).toBeUndefined();
-      expect(result.duration).toBeGreaterThanOrEqual(0);
-    });
-
-    it('returns failure result when executeImpl throws', async () => {
-      const agent = new FailingAgent(makeConfig());
-      const result = await agent.run();
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Intentional failure');
-      expect(result.data).toBeUndefined();
-    });
-
-    it('respects the timeout option', async () => {
-      const agent = new SlowAgent(makeConfig({ timeout: 100 }));
-      const result = await agent.run();
-
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/timed out after 100ms/);
-    });
+  it('assigns a stable id at construction', () => {
+    const agent = new TestAgent({ name: 'test' });
+    expect(typeof agent.getId()).toBe('string');
+    expect(agent.getId().length).toBeGreaterThan(0);
   });
 
-  describe('logging', () => {
-    it('accumulates log entries via getLogs()', async () => {
-      const agent = new EchoAgent(makeConfig());
-      await agent.run('hello');
-
-      const logs = agent.getLogs();
-      expect(logs.length).toBeGreaterThan(0);
-      expect(logs[0].level).toBe('info');
-      expect(logs[0].message).toContain('Echoing');
-    });
-
-    it('includes logs in result metadata', async () => {
-      const agent = new EchoAgent(makeConfig());
-      const result = await agent.run('hello');
-
-      const logs = (result.metadata as { logs: unknown[] })?.logs;
-      expect(Array.isArray(logs)).toBe(true);
-      expect(logs.length).toBeGreaterThan(0);
-    });
+  it('uses a provided id when given', () => {
+    const agent = new TestAgent({ id: 'custom-id', name: 'test' });
+    expect(agent.getId()).toBe('custom-id');
   });
 
-  describe('events', () => {
-    it('emits start and end events', async () => {
-      const agent = new EchoAgent(makeConfig());
-      const events: string[] = [];
-
-      agent.on('start', () => events.push('start'));
-      agent.on('end', () => events.push('end'));
-
-      await agent.run('hello');
-
-      expect(events).toEqual(['start', 'end']);
-    });
-
-    it('emits error event on failure', async () => {
-      const agent = new FailingAgent(makeConfig());
-      const errors: Error[] = [];
-
-      agent.on('error', (event: { error: Error }) => errors.push(event.error));
-
-      await agent.run();
-
-      expect(errors).toHaveLength(1);
-      expect(errors[0].message).toBe('Intentional failure');
-    });
+  it('returns the configured name', () => {
+    const agent = new TestAgent({ name: 'my-agent' });
+    expect(agent.getName()).toBe('my-agent');
   });
 
-  describe('id and name accessors', () => {
-    it('exposes id and name from config', () => {
-      const agent = new EchoAgent(makeConfig({ id: 'my-id', name: 'My Agent' }));
-      expect(agent.id).toBe('my-id');
-      expect(agent.name).toBe('My Agent');
-    });
+  it('starts in idle status', () => {
+    const agent = new TestAgent({ name: 'test' });
+    expect(agent.getStatus()).toBe('idle');
+  });
+
+  it('emits status events on transition', async () => {
+    const agent = new TestAgent({ name: 'test' });
+    const statuses: string[] = [];
+    agent.on('status', (s) => statuses.push(s));
+
+    await agent.run();
+
+    expect(statuses).toEqual(['running', 'stopped']);
+  });
+
+  it('calls lifecycle methods correctly', async () => {
+    const agent = new TestAgent({ name: 'test' });
+    await agent.initialize();
+    const result = await agent.run();
+    await agent.stop();
+
+    expect(agent.initCalled).toBe(true);
+    expect(agent.runCalled).toBe(true);
+    expect(agent.stopCalled).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.data).toBe('done');
+  });
+
+  it('emits log events via protected log()', () => {
+    class LoggingAgent extends BaseAgent<AgentConfig, void> {
+      async initialize() {
+        this.log('initializing');
+      }
+      async run(): Promise<AgentResult<void>> {
+        return { success: true, duration: 0 };
+      }
+      async stop() {}
+    }
+
+    const agent = new LoggingAgent({ name: 'logger' });
+    const messages: string[] = [];
+    agent.on('log', (m) => messages.push(m));
+
+    void agent.initialize();
+    expect(messages).toEqual(['initializing']);
   });
 });

@@ -1,2 +1,2 @@
-export { BaseAgent } from './base-agent.js';
-export type { AgentConfig, AgentLogger, AgentResult, AgentStatus, LogLevel } from './types.js';
+export { BaseAgent } from './base-agent';
+export type { AgentConfig, AgentResult, AgentStatus, AgentEvents } from './types';

@@ -1,45 +1,49 @@
 /**
- * Agent lifecycle status.
+ * Possible lifecycle states for an agent.
  */
-export type AgentStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type AgentStatus =
+  | 'idle'
+  | 'initializing'
+  | 'running'
+  | 'stopping'
+  | 'stopped'
+  | 'error';
 
 /**
- * Log level for agent output.
- */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-/**
- * Configuration passed to BaseAgent constructor.
+ * Base configuration shared by all agent implementations.
  */
 export interface AgentConfig {
-  /** Human-readable name used in logs and results. */
+  /** Unique identifier for this agent instance. Auto-generated if omitted. */
+  id?: string;
+  /** Human-readable name for the agent. */
   name: string;
-  /** Minimum log level to emit. Defaults to 'info'. */
-  logLevel?: LogLevel;
+  /** Maximum execution time in milliseconds before the agent is force-stopped. */
+  timeout?: number;
 }
 
 /**
- * Structured logger interface for agents.
+ * Standardised result returned by `BaseAgent.run()`.
  */
-export interface AgentLogger {
-  debug(message: string, meta?: Record<string, unknown>): void;
-  info(message: string, meta?: Record<string, unknown>): void;
-  warn(message: string, meta?: Record<string, unknown>): void;
-  error(message: string, meta?: Record<string, unknown>): void;
-}
-
-/**
- * Result returned by BaseAgent.run().
- */
-export interface AgentResult<TOutput = unknown> {
-  /** Whether the agent completed without throwing. */
+export interface AgentResult<T = unknown> {
+  /** Whether the agent completed without a fatal error. */
   success: boolean;
-  /** Output produced by execute(), only present on success. */
-  data?: TOutput;
-  /** Error message, only present on failure. */
-  error?: string;
-  /** Wall-clock duration in milliseconds. */
+  /** Typed payload produced by the agent. */
+  data?: T;
+  /** Error captured when `success` is false. */
+  error?: Error;
+  /** Wall-clock duration of the run in milliseconds. */
   duration: number;
-  /** Name of the agent that produced this result. */
-  agentName: string;
+}
+
+/**
+ * Events emitted by every agent.
+ * Used to type-check EventEmitter calls and listeners.
+ */
+export interface AgentEvents {
+  /** Fired whenever the agent transitions to a new lifecycle state. */
+  status: [status: AgentStatus];
+  /** Fired when the agent encounters a non-fatal error. */
+  error: [error: Error];
+  /** Generic progress/log message event. */
+  log: [message: string];
 }
