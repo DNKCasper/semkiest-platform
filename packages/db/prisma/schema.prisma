@@ -1,0 +1,189 @@
+// Prisma schema for SemkiEst Platform
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Organization & Project ──────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projects   Project[]
+  thresholds QualityThreshold[]
+
+  @@map("organizations")
+}
+
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  testRuns          TestRun[]
+  dailyMetrics      DailyQualityMetric[]
+  regressionAlerts  RegressionAlert[]
+  thresholds        QualityThreshold[]
+
+  @@index([organizationId])
+  @@map("projects")
+}
+
+// ─── Raw Test Results ────────────────────────────────────────────────────────
+
+enum TestStatus {
+  PASSED
+  FAILED
+  SKIPPED
+  ERROR
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+model TestRun {
+  id          String     @id @default(cuid())
+  projectId   String     @map("project_id")
+  externalId  String?    @map("external_id")  // ID from test runner
+  runAt       DateTime   @map("run_at")
+  timezone    String     @default("UTC")
+  durationMs  Int        @map("duration_ms")
+  totalTests  Int        @map("total_tests")
+  passedTests Int        @map("passed_tests")
+  failedTests Int        @map("failed_tests")
+  skippedTests Int       @map("skipped_tests")
+  errorTests  Int        @default(0) @map("error_tests")
+  bugCount    Int        @default(0) @map("bug_count")
+  coverage    Float?     // percentage 0–100
+  metadata    Json?      // arbitrary runner metadata
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bugReports   BugReport[]
+
+  @@index([projectId, runAt])
+  @@index([runAt])
+  @@map("test_runs")
+}
+
+model BugReport {
+  id        String   @id @default(cuid())
+  testRunId String   @map("test_run_id")
+  title     String
+  severity  Severity
+  createdAt DateTime @default(now()) @map("created_at")
+
+  testRun TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId])
+  @@index([severity])
+  @@map("bug_reports")
+}
+
+// ─── Aggregated Quality Metrics ──────────────────────────────────────────────
+
+model DailyQualityMetric {
+  id             String   @id @default(cuid())
+  projectId      String   @map("project_id")
+  metricDate     DateTime @map("metric_date") @db.Date
+  timezone       String   @default("UTC")
+  runCount       Int      @map("run_count")
+  totalTests     Int      @map("total_tests")
+  passedTests    Int      @map("passed_tests")
+  failedTests    Int      @map("failed_tests")
+  skippedTests   Int      @map("skipped_tests")
+  passRate       Float    @map("pass_rate")   // 0.0 – 1.0
+  bugCount       Int      @map("bug_count")
+  criticalBugs   Int      @default(0) @map("critical_bugs")
+  highBugs       Int      @default(0) @map("high_bugs")
+  mediumBugs     Int      @default(0) @map("medium_bugs")
+  lowBugs        Int      @default(0) @map("low_bugs")
+  avgCoverage    Float?   @map("avg_coverage")
+  avgDurationMs  Float?   @map("avg_duration_ms")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, metricDate, timezone])
+  @@index([projectId, metricDate])
+  @@map("daily_quality_metrics")
+}
+
+// ─── Threshold Configuration ─────────────────────────────────────────────────
+
+model QualityThreshold {
+  id                  String   @id @default(cuid())
+  organizationId      String?  @map("organization_id")
+  projectId           String?  @map("project_id")  // null = org-level default
+  minPassRate         Float    @default(0.8) @map("min_pass_rate")
+  maxBugCount         Int?     @map("max_bug_count")
+  maxCriticalBugs     Int      @default(0) @map("max_critical_bugs")
+  minCoverage         Float?   @map("min_coverage")
+  regressionSensitivity Float  @default(2.0) @map("regression_sensitivity") // stddev multiplier
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, projectId])
+  @@map("quality_thresholds")
+}
+
+// ─── Regression Alerts ───────────────────────────────────────────────────────
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum AlertType {
+  PASS_RATE_DROP
+  BUG_COUNT_SPIKE
+  COVERAGE_DROP
+  STATISTICAL_DEVIATION
+}
+
+model RegressionAlert {
+  id              String      @id @default(cuid())
+  projectId       String      @map("project_id")
+  alertType       AlertType   @map("alert_type")
+  status          AlertStatus @default(OPEN)
+  detectedAt      DateTime    @map("detected_at")
+  resolvedAt      DateTime?   @map("resolved_at")
+  metricDate      DateTime    @map("metric_date") @db.Date
+  currentValue    Float       @map("current_value")
+  baselineValue   Float       @map("baseline_value")
+  threshold       Float
+  deviation       Float       // how many stddevs or % below threshold
+  message         String
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, detectedAt])
+  @@index([status])
+  @@map("regression_alerts")
+}
