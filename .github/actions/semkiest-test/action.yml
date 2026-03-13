@@ -1,0 +1,373 @@
+name: 'SemkiEst Test Runner'
+description: >
+  Triggers a SemkiEst test run, polls for completion, and reports results
+  as a GitHub commit status check with a PR comment summary.
+author: 'SemkiEst'
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+# ---------------------------------------------------------------------------
+# Inputs
+# ---------------------------------------------------------------------------
+inputs:
+  api-url:
+    description: 'SemkiEst API base URL (e.g. https://api.semkiest.io)'
+    required: true
+
+  api-token:
+    description: 'SemkiEst API authentication token (store as a secret)'
+    required: true
+
+  project-id:
+    description: 'SemkiEst project identifier to run tests for'
+    required: true
+
+  test-profile:
+    description: >
+      Test profile name to execute. If omitted the project default profile
+      is used.
+    required: false
+    default: ''
+
+  github-token:
+    description: >
+      GitHub token used to post commit statuses and PR comments.
+      Requires repo:status and pull_requests:write scopes.
+    required: false
+    default: ${{ github.token }}
+
+  commit-sha:
+    description: 'Commit SHA to attach the status check to'
+    required: false
+    default: ${{ github.sha }}
+
+  pr-number:
+    description: >
+      Pull Request number to post the result comment on.
+      Leave empty to skip posting a PR comment.
+    required: false
+    default: ''
+
+  check-context:
+    description: 'Unique context label for the GitHub status check'
+    required: false
+    default: 'semkiest/test-run'
+
+  poll-interval-seconds:
+    description: 'How often (in seconds) to poll the API for run status'
+    required: false
+    default: '5'
+
+  timeout-minutes:
+    description: 'Maximum time to wait for the test run to complete'
+    required: false
+    default: '10'
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+outputs:
+  run-id:
+    description: 'SemkiEst test run ID'
+    value: ${{ steps.trigger.outputs.run-id }}
+
+  status:
+    description: 'Final test run status: passed | failed | cancelled | timeout'
+    value: ${{ steps.poll.outputs.status }}
+
+  report-url:
+    description: 'URL to the full test report (may be empty)'
+    value: ${{ steps.poll.outputs.report-url }}
+
+  passed:
+    description: 'Number of passed tests'
+    value: ${{ steps.poll.outputs.passed }}
+
+  failed:
+    description: 'Number of failed tests'
+    value: ${{ steps.poll.outputs.failed }}
+
+  total:
+    description: 'Total number of tests executed'
+    value: ${{ steps.poll.outputs.total }}
+
+# ---------------------------------------------------------------------------
+# Steps
+# ---------------------------------------------------------------------------
+runs:
+  using: 'composite'
+  steps:
+    # -------------------------------------------------------------------------
+    # 1. Set pending status so the PR check appears immediately
+    # -------------------------------------------------------------------------
+    - name: Post pending status check
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        CHECK_CONTEXT: ${{ inputs.check-context }}
+        REPO: ${{ github.repository }}
+      run: |
+        OWNER="${REPO%%/*}"
+        REPO_NAME="${REPO##*/}"
+        curl -s -o /dev/null -X POST \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          -H "User-Agent: semkiest-github-action/1.0.0" \
+          "https://api.github.com/repos/${OWNER}/${REPO_NAME}/statuses/${COMMIT_SHA}" \
+          -d "{\"state\":\"pending\",\"context\":\"${CHECK_CONTEXT}\",\"description\":\"SemkiEst test run queued...\"}"
+
+    # -------------------------------------------------------------------------
+    # 2. Trigger the test run via the SemkiEst API
+    # -------------------------------------------------------------------------
+    - name: Trigger SemkiEst test run
+      id: trigger
+      shell: bash
+      env:
+        API_URL: ${{ inputs.api-url }}
+        API_TOKEN: ${{ inputs.api-token }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        TEST_PROFILE: ${{ inputs.test-profile }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        REPO: ${{ github.repository }}
+        REF_NAME: ${{ github.ref_name }}
+      run: |
+        PAYLOAD=$(node -e "
+          const req = {
+            projectId: process.env.PROJECT_ID,
+            triggerSource: 'github_pr',
+            metadata: {
+              commitSha: process.env.COMMIT_SHA,
+              branch: process.env.REF_NAME,
+              repository: process.env.REPO,
+            },
+          };
+          if (process.env.TEST_PROFILE) req.testProfile = process.env.TEST_PROFILE;
+          if (process.env.PR_NUMBER) req.metadata.prNumber = Number(process.env.PR_NUMBER);
+          process.stdout.write(JSON.stringify(req));
+        ")
+
+        RESPONSE=$(curl -s -w '\n%{http_code}' -X POST \
+          -H "Authorization: Bearer ${API_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -H "User-Agent: semkiest-github-action/1.0.0" \
+          "${API_URL}/api/test-runs" \
+          -d "${PAYLOAD}")
+
+        HTTP_CODE=$(printf '%s' "${RESPONSE}" | tail -n1)
+        BODY=$(printf '%s' "${RESPONSE}" | head -n -1)
+
+        if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+          echo "::error::Failed to trigger SemkiEst test run: HTTP ${HTTP_CODE} — ${BODY}"
+          exit 1
+        fi
+
+        RUN_ID=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).runId);" <<< "${BODY}")
+        echo "run-id=${RUN_ID}" >> "${GITHUB_OUTPUT}"
+        echo "::notice::SemkiEst test run triggered — run ID: ${RUN_ID}"
+
+    # -------------------------------------------------------------------------
+    # 3. Poll the API until the run reaches a terminal state
+    # -------------------------------------------------------------------------
+    - name: Poll for test run completion
+      id: poll
+      shell: bash
+      env:
+        API_URL: ${{ inputs.api-url }}
+        API_TOKEN: ${{ inputs.api-token }}
+        RUN_ID: ${{ steps.trigger.outputs.run-id }}
+        POLL_INTERVAL: ${{ inputs.poll-interval-seconds }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
+      run: |
+        TIMEOUT_SECONDS=$(( TIMEOUT_MINUTES * 60 ))
+        ELAPSED=0
+        TERMINAL='passed failed cancelled timeout'
+
+        while true; do
+          if [ "${ELAPSED}" -ge "${TIMEOUT_SECONDS}" ]; then
+            echo "::error::SemkiEst test run ${RUN_ID} timed out after ${TIMEOUT_MINUTES} minutes"
+            echo "status=timeout" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
+
+          RESPONSE=$(curl -s -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${API_TOKEN}" \
+            -H "User-Agent: semkiest-github-action/1.0.0" \
+            "${API_URL}/api/test-runs/${RUN_ID}")
+
+          HTTP_CODE=$(printf '%s' "${RESPONSE}" | tail -n1)
+          BODY=$(printf '%s' "${RESPONSE}" | head -n -1)
+
+          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+            echo "::warning::Poll attempt failed: HTTP ${HTTP_CODE} — retrying in ${POLL_INTERVAL}s"
+            sleep "${POLL_INTERVAL}"
+            ELAPSED=$(( ELAPSED + POLL_INTERVAL ))
+            continue
+          fi
+
+          STATUS=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).status);" <<< "${BODY}")
+          echo "::debug::Run ${RUN_ID} status: ${STATUS} (elapsed: ${ELAPSED}s)"
+
+          if echo "${TERMINAL}" | grep -qw "${STATUS}"; then
+            SUMMARY=$(node -e "
+              const r = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+              const s = r.summary || {};
+              const lines = [
+                'status=' + r.status,
+                'report-url=' + (r.reportUrl || ''),
+                'passed=' + (s.passed != null ? s.passed : ''),
+                'failed=' + (s.failed != null ? s.failed : ''),
+                'total='  + (s.total  != null ? s.total  : ''),
+              ];
+              process.stdout.write(lines.join('\n'));
+            " <<< "${BODY}")
+            printf '%s\n' "${SUMMARY}" >> "${GITHUB_OUTPUT}"
+            break
+          fi
+
+          sleep "${POLL_INTERVAL}"
+          ELAPSED=$(( ELAPSED + POLL_INTERVAL ))
+        done
+
+    # -------------------------------------------------------------------------
+    # 4. Post the final commit status check (always runs)
+    # -------------------------------------------------------------------------
+    - name: Post final status check
+      if: always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        CHECK_CONTEXT: ${{ inputs.check-context }}
+        REPO: ${{ github.repository }}
+        RUN_STATUS: ${{ steps.poll.outputs.status }}
+        REPORT_URL: ${{ steps.poll.outputs.report-url }}
+        PASSED: ${{ steps.poll.outputs.passed }}
+        FAILED: ${{ steps.poll.outputs.failed }}
+        TOTAL: ${{ steps.poll.outputs.total }}
+      run: |
+        OWNER="${REPO%%/*}"
+        REPO_NAME="${REPO##*/}"
+
+        case "${RUN_STATUS}" in
+          passed)
+            GH_STATE="success"
+            DESCRIPTION="All ${TOTAL} tests passed"
+            ;;
+          failed)
+            GH_STATE="failure"
+            DESCRIPTION="${FAILED} of ${TOTAL} tests failed"
+            ;;
+          cancelled)
+            GH_STATE="error"
+            DESCRIPTION="Test run was cancelled"
+            ;;
+          timeout)
+            GH_STATE="error"
+            DESCRIPTION="Test run timed out"
+            ;;
+          *)
+            GH_STATE="error"
+            DESCRIPTION="Test run status: ${RUN_STATUS:-unknown}"
+            ;;
+        esac
+
+        PAYLOAD=$(node -e "
+          const body = {
+            state: process.env.GH_STATE,
+            context: process.env.CHECK_CONTEXT,
+            description: (process.env.DESCRIPTION || '').slice(0, 140),
+          };
+          if (process.env.REPORT_URL) body.target_url = process.env.REPORT_URL;
+          process.stdout.write(JSON.stringify(body));
+        " GH_STATE="${GH_STATE}" DESCRIPTION="${DESCRIPTION}")
+
+        curl -s -o /dev/null -X POST \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          -H "User-Agent: semkiest-github-action/1.0.0" \
+          "https://api.github.com/repos/${OWNER}/${REPO_NAME}/statuses/${COMMIT_SHA}" \
+          -d "${PAYLOAD}"
+
+    # -------------------------------------------------------------------------
+    # 5. Post PR comment with test summary (only when pr-number is provided)
+    # -------------------------------------------------------------------------
+    - name: Post PR comment
+      if: inputs.pr-number != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        RUN_ID: ${{ steps.trigger.outputs.run-id }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        TEST_PROFILE: ${{ inputs.test-profile }}
+        RUN_STATUS: ${{ steps.poll.outputs.status }}
+        REPORT_URL: ${{ steps.poll.outputs.report-url }}
+        PASSED: ${{ steps.poll.outputs.passed }}
+        FAILED: ${{ steps.poll.outputs.failed }}
+        TOTAL: ${{ steps.poll.outputs.total }}
+      run: |
+        OWNER="${REPO%%/*}"
+        REPO_NAME="${REPO##*/}"
+
+        COMMENT=$(node -e "
+          const status  = process.env.RUN_STATUS  || 'unknown';
+          const passed  = parseInt(process.env.PASSED  || '0', 10);
+          const failed  = parseInt(process.env.FAILED  || '0', 10);
+          const total   = parseInt(process.env.TOTAL   || '0', 10);
+          const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+          const isOk    = status === 'passed';
+          const icon    = isOk ? ':white_check_mark:' : ':x:';
+          const label   = isOk ? 'Tests Passed' : 'Tests Failed';
+
+          const lines = [
+            '## :microscope: SemkiEst Test Results \u2014 ' + icon + ' ' + label,
+            '',
+            '**Run ID:** \`' + process.env.RUN_ID + '\`',
+            '**Project:** \`' + process.env.PROJECT_ID + '\`',
+          ];
+
+          if (process.env.TEST_PROFILE) {
+            lines.push('**Profile:** \`' + process.env.TEST_PROFILE + '\`');
+          }
+
+          lines.push('');
+
+          if (total > 0) {
+            lines.push(
+              '### Summary', '',
+              '| Metric | Value |',
+              '|:-------|------:|',
+              '| :white_check_mark: Passed | **' + passed + '** |',
+              '| :x: Failed | **' + failed + '** |',
+              '| Total | **' + total + '** |',
+              '| Pass Rate | **' + passRate + '%** |',
+              '',
+            );
+          }
+
+          if (process.env.REPORT_URL) {
+            lines.push('[:microscope: View Full Report](' + process.env.REPORT_URL + ')', '');
+          }
+
+          lines.push(
+            '<sub>Generated by [SemkiEst](https://semkiest.io) at ' +
+            new Date().toUTCString() + '</sub>'
+          );
+
+          process.stdout.write(JSON.stringify({ body: lines.join('\n') }));
+        ")
+
+        curl -s -o /dev/null -X POST \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          -H "User-Agent: semkiest-github-action/1.0.0" \
+          "https://api.github.com/repos/${OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments" \
+          -d "${COMMENT}"
