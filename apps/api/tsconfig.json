@@ -1,18 +1,51 @@
 {
-  "extends": "../../packages/shared-config/tsconfig/node.json",
-  "compilerOptions": {
-    "baseUrl": ".",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "paths": {
-      "@semkiest/shared-types": ["../../packages/shared-types/src"],
-      "@semkiest/shared-utils": ["../../packages/shared-utils/src"],
-      "@semkiest/shared-config": ["../../packages/shared-config/src"],
-      "@semkiest/shared-config/*": ["../../packages/shared-config/src/*"],
-      "@semkiest/db": ["../../packages/db/src"],
-      "@semkiest/slack-integration": ["../../packages/integrations/slack/src"]
+  "references": [
+    {
+      "path": "../../packages/shared"
+    },
+    {
+      "path": "../../packages/database"
     }
+  ],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*"
+  ],
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@semkiest/slack-integration": [
+        "../../packages/integrations/slack/src"
+      ],
+      "@semkiest/shared-types": [
+        "../../packages/shared-types/src"
+      ],
+      "@semkiest/db": [
+        "../../packages/db/src"
+      ],
+      "@semkiest/shared-utils": [
+        "../../packages/shared-utils/src"
+      ],
+      "@semkiest/shared-config/*": [
+        "../../packages/shared-config/src/*"
+      ],
+      "@semkiest/shared-config": [
+        "../../packages/shared-config/src"
+      ],
+      "@sem/database": [
+        "../../packages/database/dist/index.d.ts"
+      ],
+      "@sem/shared": [
+        "../../packages/shared/dist/index.d.ts"
+      ]
+    },
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "baseUrl": "."
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
