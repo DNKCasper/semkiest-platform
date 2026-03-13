@@ -1,33 +1,47 @@
 {
-  "name": "@semkiest/db",
+  "main": "./dist/index.js",
+  "scripts": {
+    "lint": "eslint src/",
+    "db:seed": "ts-node prisma/seed.ts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "migrate:status": "prisma migrate status",
+    "db:push": "prisma db push",
+    "build": "tsc --project tsconfig.build.json",
+    "seed": "tsx prisma/seed.ts",
+    "migrate:dev": "prisma migrate dev",
+    "seed:dev": "NODE_ENV=development tsx scripts/seed-dev.ts",
+    "studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed:test": "NODE_ENV=test tsx scripts/seed-test.ts",
+    "migrate:reset": "prisma migrate reset --force",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "prisma migrate dev"
+  },
   "version": "0.0.1",
   "private": true,
-  "description": "Database client and Prisma ORM for SemkiEst platform",
-  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc --project tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
-    "generate": "prisma generate",
-    "migrate:dev": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
-    "migrate:status": "prisma migrate status",
-    "migrate:reset": "prisma migrate reset --force",
-    "seed": "tsx prisma/seed.ts",
-    "seed:dev": "NODE_ENV=development tsx scripts/seed-dev.ts",
-    "seed:test": "NODE_ENV=test tsx scripts/seed-test.ts",
-    "studio": "prisma studio"
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "description": "Database client and Prisma ORM for SemkiEst platform",
+  "name": "@semkiest/db",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "prisma": "^5.10.0",
+    "tsx": "^4.7.0",
+    "tsup": "^8.0.0"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0"
-  },
-  "devDependencies": {
-    "prisma": "^5.10.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   }
 }
