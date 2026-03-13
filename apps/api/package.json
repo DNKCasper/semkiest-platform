@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@semkiest/db": "workspace:*",
+    "@semkiest/jira-integration": "workspace:*",
     "@semkiest/shared-config": "workspace:*",
     "@semkiest/shared-types": "workspace:*",
     "@semkiest/shared-utils": "workspace:*",
