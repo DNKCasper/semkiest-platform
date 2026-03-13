@@ -73,6 +73,15 @@ export const apiEnvSchema = databaseEnvSchema.merge(redisEnvSchema).merge(
      * When set, internal endpoints require this key in the X-API-Key header.
      */
     INTERNAL_API_KEY: z.string().min(16).optional(),
+
+    /**
+     * GitHub webhook secret used to validate HMAC-SHA256 signatures on
+     * incoming webhook payloads (`X-Hub-Signature-256` header).
+     * Configure this in your GitHub repository webhook settings.
+     * When unset, signature verification is skipped (not recommended for production).
+     * Minimum 20 characters.
+     */
+    GITHUB_WEBHOOK_SECRET: z.string().min(20).optional(),
   }),
 );
 
