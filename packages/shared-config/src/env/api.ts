@@ -73,6 +73,52 @@ export const apiEnvSchema = databaseEnvSchema.merge(redisEnvSchema).merge(
      * When set, internal endpoints require this key in the X-API-Key header.
      */
     INTERNAL_API_KEY: z.string().min(16).optional(),
+
+    /**
+     * Per-organization rate limit: maximum number of API requests allowed
+     * within RATE_LIMIT_DURATION seconds.
+     * Default: 1000
+     */
+    RATE_LIMIT_POINTS: z
+      .string()
+      .regex(/^\d+$/, 'RATE_LIMIT_POINTS must be a positive integer')
+      .transform(Number)
+      .pipe(z.number().int().min(1))
+      .default('1000'),
+
+    /**
+     * Rate limit window size in seconds.
+     * Default: 60 (1 minute)
+     */
+    RATE_LIMIT_DURATION: z
+      .string()
+      .regex(/^\d+$/, 'RATE_LIMIT_DURATION must be a positive integer')
+      .transform(Number)
+      .pipe(z.number().int().min(1))
+      .default('60'),
+
+    /**
+     * LLM API rate limit: maximum number of LLM calls allowed within
+     * LLM_RATE_LIMIT_DURATION seconds per organization.
+     * Default: 60
+     */
+    LLM_RATE_LIMIT_POINTS: z
+      .string()
+      .regex(/^\d+$/, 'LLM_RATE_LIMIT_POINTS must be a positive integer')
+      .transform(Number)
+      .pipe(z.number().int().min(1))
+      .default('60'),
+
+    /**
+     * LLM rate limit window size in seconds.
+     * Default: 60 (1 minute)
+     */
+    LLM_RATE_LIMIT_DURATION: z
+      .string()
+      .regex(/^\d+$/, 'LLM_RATE_LIMIT_DURATION must be a positive integer')
+      .transform(Number)
+      .pipe(z.number().int().min(1))
+      .default('60'),
   }),
 );
 

@@ -6,6 +6,14 @@ import type {
   UpdateProjectInput,
   ApiError,
 } from '../types/project';
+import type {
+  TestProfile,
+  ProfileListResponse,
+  ProfileQueryParams,
+  CreateProfileInput,
+  UpdateProfileInput,
+  CloneProfileInput,
+} from '../types/profile';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -47,7 +55,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function buildQueryString(params: ProjectQueryParams): string {
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
   const entries = Object.entries(params).filter(
     ([, v]) => v !== undefined && v !== '',
   );
@@ -93,6 +101,72 @@ export const projectsApi = {
     return request<void>(`/api/projects/${id}`, {
       method: 'DELETE',
     });
+  },
+};
+
+/** Profile API methods */
+export const profilesApi = {
+  /** GET /api/projects/:projectId/profiles */
+  list(
+    projectId: string,
+    params: ProfileQueryParams = {},
+  ): Promise<ProfileListResponse> {
+    return request<ProfileListResponse>(
+      `/api/projects/${projectId}/profiles${buildQueryString(params as Record<string, string | number | boolean | undefined>)}`,
+    );
+  },
+
+  /** GET /api/projects/:projectId/profiles/:id */
+  get(projectId: string, id: string): Promise<TestProfile> {
+    return request<TestProfile>(`/api/projects/${projectId}/profiles/${id}`);
+  },
+
+  /** POST /api/projects/:projectId/profiles */
+  create(
+    projectId: string,
+    input: CreateProfileInput,
+  ): Promise<TestProfile> {
+    return request<TestProfile>(`/api/projects/${projectId}/profiles`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  /** PUT /api/projects/:projectId/profiles/:id */
+  update(
+    projectId: string,
+    id: string,
+    input: UpdateProfileInput,
+  ): Promise<TestProfile> {
+    return request<TestProfile>(
+      `/api/projects/${projectId}/profiles/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      },
+    );
+  },
+
+  /** DELETE /api/projects/:projectId/profiles/:id */
+  delete(projectId: string, id: string): Promise<void> {
+    return request<void>(`/api/projects/${projectId}/profiles/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** POST /api/projects/:projectId/profiles/:id/clone */
+  clone(
+    projectId: string,
+    id: string,
+    input: CloneProfileInput,
+  ): Promise<TestProfile> {
+    return request<TestProfile>(
+      `/api/projects/${projectId}/profiles/${id}/clone`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
   },
 };
 
