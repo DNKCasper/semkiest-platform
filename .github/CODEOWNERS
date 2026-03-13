@@ -1,0 +1,36 @@
+# CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+# Owners are matched against the most specific pattern.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @semkiest-platform/engineers
+
+# Monorepo root configuration
+/package.json @semkiest-platform/engineers
+/turbo.json @semkiest-platform/engineers
+/tsconfig.json @semkiest-platform/engineers
+/.eslintrc* @semkiest-platform/engineers
+/.prettierrc* @semkiest-platform/engineers
+/pnpm-workspace.yaml @semkiest-platform/engineers
+
+# CI/CD and GitHub configuration
+/.github/ @semkiest-platform/engineers
+
+# Backend API
+/packages/api/ @semkiest-platform/backend
+
+# Frontend web app
+/packages/web/ @semkiest-platform/frontend
+
+# Shared utilities and types
+/packages/shared/ @semkiest-platform/engineers
+
+# Database schema and migrations
+/packages/database/ @semkiest-platform/backend
+
+# Job queue
+/packages/queue/ @semkiest-platform/backend
+
+# Shared UI component library
+/packages/ui/ @semkiest-platform/frontend

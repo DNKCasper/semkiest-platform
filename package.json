@@ -1,25 +1,31 @@
 {
-  "name": "semkiest-platform",
-  "version": "0.0.0",
-  "private": true,
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "test": "turbo run test",
+    "db:seed": "pnpm --filter @semkiest/db seed",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "db:seed:dev": "pnpm --filter @semkiest/db seed:dev",
+    "db:generate": "pnpm --filter @semkiest/db prisma generate",
+    "db:seed:test": "pnpm --filter @semkiest/db seed:test",
+    "db:migrate": "pnpm --filter @semkiest/db migrate:dev",
     "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "clean": "turbo run clean"
   },
+  "version": "0.0.1",
+  "private": true,
+  "description": "SemkiEst Platform \u2014 modern collaborative application",
+  "name": "semkiest-platform",
+  "engines": {
+    "pnpm": ">=8.0.0",
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
     "@commitlint/config-conventional": "^19.0.0",
     "husky": "^9.0.0",
-    "turbo": "^2.0.0",
-    "typescript": "^5.4.0"
-  },
-  "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "@commitlint/cli": "^19.0.0"
   },
   "packageManager": "pnpm@9.0.0"
 }
