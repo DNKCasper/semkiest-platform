@@ -75,13 +75,17 @@ export const apiEnvSchema = databaseEnvSchema.merge(redisEnvSchema).merge(
     INTERNAL_API_KEY: z.string().min(16).optional(),
 
     /**
-     * GitHub webhook secret used to validate HMAC-SHA256 signatures on
-     * incoming webhook payloads (`X-Hub-Signature-256` header).
-     * Configure this in your GitHub repository webhook settings.
-     * When unset, signature verification is skipped (not recommended for production).
-     * Minimum 20 characters.
+     * Sentry DSN (Data Source Name) for error tracking.
+     * When set, all unhandled errors are captured and sent to Sentry.
+     * Leave unset to disable Sentry (safe in development/test).
      */
-    GITHUB_WEBHOOK_SECRET: z.string().min(20).optional(),
+    SENTRY_DSN: z.string().url('SENTRY_DSN must be a valid URL').optional(),
+
+    /**
+     * Sentry release identifier (e.g. git commit SHA or semver tag).
+     * Used to associate errors with a specific deployment for source map lookup.
+     */
+    SENTRY_RELEASE: z.string().min(1).optional(),
   }),
 );
 

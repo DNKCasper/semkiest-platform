@@ -1,50 +1,53 @@
-import { Redis } from 'ioredis';
-import { parseWorkerEnv, parseRedisEnv } from '@semkiest/shared-config';
-import { createSchedulerWorker } from './workers/scheduler.worker';
+import { parseWorkerEnv } from '@semkiest/shared-config/env/worker';
+import { initWorkerSentry, flushSentry } from './sentry';
+import { WorkerPool } from './crash-recovery';
 
-// ---------------------------------------------------------------------------
-// Environment validation
-// ---------------------------------------------------------------------------
-const workerEnv = parseWorkerEnv();
-const redisEnv = parseRedisEnv();
+const env = parseWorkerEnv();
 
-// ---------------------------------------------------------------------------
-// Redis connection
-// ---------------------------------------------------------------------------
-const redis = new Redis(redisEnv.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  keyPrefix: redisEnv.REDIS_KEY_PREFIX,
-  retryStrategy: (times) => Math.min(times * 200, 5000),
+// Initialise Sentry before any workers start.
+initWorkerSentry({
+  dsn: process.env['SENTRY_DSN'],
+  environment: env.NODE_ENV,
+  release: process.env['SENTRY_RELEASE'],
 });
 
-redis.on('connect', () => console.info('[worker] Redis connected'));
-redis.on('error', (err) => console.error('[worker] Redis error:', err));
+const [redisHost, redisPort] = (() => {
+  try {
+    const url = new URL(env.REDIS_URL);
+    return [url.hostname, Number(url.port) || 6379] as const;
+  } catch {
+    return ['localhost', 6379] as const;
+  }
+})();
 
-// ---------------------------------------------------------------------------
-// Start workers
-// ---------------------------------------------------------------------------
-const concurrency = workerEnv.WORKER_CONCURRENCY;
+const pool = new WorkerPool({
+  connection: { host: redisHost, port: redisPort },
+  maxRestarts: 3,
+  restartDelayMs: 5_000,
+  onRestart: (queueName, attempt) => {
+    // eslint-disable-next-line no-console
+    console.warn(`[worker] Restarting processor for queue "${queueName}" (attempt ${attempt})`);
+  },
+  onFatalCrash: (queueName, err) => {
+    // eslint-disable-next-line no-console
+    console.error(`[worker] Fatal crash in queue "${queueName}":`, err);
+  },
+});
 
-const schedulerWorker = createSchedulerWorker(
-  redis as unknown as Parameters<typeof createSchedulerWorker>[0],
-  concurrency,
-);
+// ── Queue registrations go here ──────────────────────────────────────────────
+// pool.add('my-queue', async (job) => { ... });
 
-console.info(`[worker] Scheduler worker started (concurrency=${concurrency})`);
-
-// ---------------------------------------------------------------------------
-// Graceful shutdown
-// ---------------------------------------------------------------------------
+// ── Graceful shutdown ────────────────────────────────────────────────────────
 async function shutdown(signal: string): Promise<void> {
-  console.info(`[worker] Received ${signal}, shutting down…`);
-  await schedulerWorker.close();
-  await redis.quit();
+  // eslint-disable-next-line no-console
+  console.log(`[worker] Received ${signal}, shutting down…`);
+  await pool.closeAll();
+  await flushSentry();
   process.exit(0);
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('uncaughtException', (err) => {
-  console.error('[worker] Uncaught exception:', err);
-  shutdown('uncaughtException').catch(() => process.exit(1));
-});
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+
+// eslint-disable-next-line no-console
+console.log(`[worker] Started [${env.NODE_ENV}] — concurrency: ${env.WORKER_CONCURRENCY}`);

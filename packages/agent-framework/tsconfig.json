@@ -1,8 +1,5 @@
 {
-  "extends": "../shared-config/tsconfig/base.json",
-  "include": [
-    "src/**/*.ts"
-  ],
+  "extends": "../../packages/shared-config/tsconfig/node.json",
   "exclude": [
     "node_modules",
     "dist"
@@ -15,9 +12,12 @@
     },
     "moduleResolution": "node",
     "target": "ES2022",
-    "rootDir": "./src",
     "module": "commonjs",
+    "rootDir": "./src",
     "outDir": "./dist",
     "baseUrl": "."
-  }
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
 }

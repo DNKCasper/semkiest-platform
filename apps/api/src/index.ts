@@ -1,37 +1,35 @@
-import express from 'express';
-import { WebClient } from '@slack/web-api';
 import { parseApiEnv } from '@semkiest/shared-config/env/api';
-import { parseSlackEnv } from '@semkiest/shared-config/env/slack';
-import { createSlackRouter } from './routes/integrations/slack';
+import { initSentry, sentryErrorMiddleware } from './middleware/sentry';
+import { errorHandler } from './middleware/error-handler';
+import express from 'express';
 
-const apiEnv = parseApiEnv();
-const slackEnv = parseSlackEnv();
+const env = parseApiEnv();
+
+// Sentry must be initialised before the app handles any requests.
+initSentry({
+  dsn: process.env['SENTRY_DSN'],
+  environment: env.NODE_ENV,
+  release: process.env['SENTRY_RELEASE'],
+});
 
 const app = express();
 
-// Global middleware
 app.use(express.json());
 
-// Health check
+// Health check endpoint
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', service: 'api' });
 });
 
-// Slack integration routes
-const slackClient = new WebClient(slackEnv.SLACK_BOT_TOKEN);
+// ── Routes go here ──────────────────────────────────────────────────────────
 
-app.use(
-  '/integrations/slack',
-  createSlackRouter({
-    signingSecret: slackEnv.SLACK_SIGNING_SECRET,
-    slackClient,
-    apiBaseUrl: slackEnv.SEMKIEST_API_URL,
-    internalApiKey: slackEnv.SEMKIEST_INTERNAL_API_KEY,
-  }),
-);
+// ── Error handling (must come after all routes) ──────────────────────────────
+app.use(sentryErrorMiddleware());
+app.use(errorHandler);
 
-app.listen(apiEnv.PORT, apiEnv.HOST, () => {
-  console.info(`[API] Server listening on http://${apiEnv.HOST}:${apiEnv.PORT}`);
+app.listen(env.PORT, env.HOST, () => {
+  // eslint-disable-next-line no-console
+  console.log(`API server listening on ${env.HOST}:${env.PORT} [${env.NODE_ENV}]`);
 });
 
 export default app;
