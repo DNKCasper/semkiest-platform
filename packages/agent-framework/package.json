@@ -1,38 +1,44 @@
 {
-  "name": "@semkiest/agent-framework",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Agent framework with event bus and inter-agent communication for SemkiEst platform",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "private": true,
+  "devDependencies": {
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0"
+  },
+  "description": "Agent framework with event bus and inter-agent communication for SemkiEst platform",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+    "./tools": {
+      "import": "./dist/tools/index.js",
+      "require": "./dist/tools/index.js",
+      "types": "./dist/tools/index.d.ts"
     },
     "./events": {
       "import": "./dist/events/index.js",
       "require": "./dist/events/index.js",
       "types": "./dist/events/index.d.ts"
+    },
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "build": "tsup src/index.ts src/events/index.ts --format cjs --dts --out-dir dist",
-    "dev": "tsup src/index.ts src/events/index.ts --format cjs --dts --watch",
-    "lint": "eslint src/",
-    "test": "jest --passWithNoTests",
-    "typecheck": "tsc --noEmit"
-  },
   "dependencies": {
+    "playwright": "^1.44.0",
     "ioredis": "^5.3.0"
   },
-  "devDependencies": {
-    "@types/jest": "^29.5.0",
-    "@types/node": "^20.0.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.4.0"
-  }
+  "version": "0.0.0",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src/",
+    "dev": "tsup src/index.ts src/events/index.ts --format cjs --dts --watch",
+    "build": "tsup src/index.ts src/events/index.ts --format cjs --dts --out-dir dist"
+  },
+  "name": "@semkiest/agent-framework"
 }
