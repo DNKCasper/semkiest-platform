@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Data Library Models ──────────────────────────────────────────────────────
+
+/**
+ * Per-project persistent data library. Each project has at most one library.
+ */
+model DataLibrary {
+  id          String    @id @default(cuid())
+  projectId   String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  dataSets    DataSet[]
+
+  @@index([projectId])
+}
+
+/**
+ * Supported import formats for test data.
+ */
+enum DataFormat {
+  CSV
+  JSON
+  SQL
+}
+
+/**
+ * Audit actions tracked for all data operations.
+ */
+enum AuditAction {
+  LIBRARY_CREATE
+  DATASET_IMPORT
+  DATASET_VERSION_CREATE
+  DATASET_TAG
+  DATASET_BASELINE_SET
+  DATASET_ROLLBACK
+  CLEANUP_EXECUTE
+  CLEANUP_ROLLBACK
+}
+
+/**
+ * A versioned data set within a library. Each version is a separate record.
+ * The combination of (libraryId, name, version) is unique.
+ */
+model DataSet {
+  id          String      @id @default(cuid())
+  libraryId   String
+  name        String
+  version     Int         @default(1)
+  tags        String[]
+  format      DataFormat
+  /// Serialised data content (rows for CSV/JSON, statements for SQL)
+  content     Json
+  /// SHA-256 hex digest of the raw content string for integrity checks
+  checksum    String
+  /// When true, cleanup service will restore this version as the baseline
+  isBaseline  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  library     DataLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  auditLogs   AuditLog[]
+
+  @@unique([libraryId, name, version])
+  @@index([libraryId])
+  @@index([tags])
+}
+
+/**
+ * Immutable audit trail for all data-library operations.
+ */
+model AuditLog {
+  id        String      @id @default(cuid())
+  projectId String
+  dataSetId String?
+  action    AuditAction
+  /// Free-form identity string (user ID, service name, etc.)
+  actor     String?
+  /// Snapshot of relevant state before the operation
+  before    Json?
+  /// Snapshot of relevant state after the operation
+  after     Json?
+  /// Additional operation metadata
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  dataSet   DataSet?    @relation(fields: [dataSetId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([dataSetId])
+  @@index([createdAt])
+}
