@@ -18,7 +18,7 @@
     }
   },
   "dependencies": {
-    "@semkiest/agents-base": "workspace:*",
+    "@semkiest/agent-base": "workspace:*",
     "cheerio": "^1.0.0",
     "mammoth": "^1.8.0",
     "pdf-parse": "^1.1.1"
