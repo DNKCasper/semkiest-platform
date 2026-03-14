@@ -15,7 +15,8 @@ COPY . .
 # Install all dependencies
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client and build shared packages, then worker
+# Generate Prisma client (dummy URL - generate only reads schema, no DB connection)
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN cd packages/db && npx prisma generate && cd /app && \
     pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-types build 2>/dev/null || true && \
