@@ -17,9 +17,6 @@ env:
   ENVIRONMENT: staging
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────
-  # Guard: only deploy if the build-and-test workflow succeeded
-  # ─────────────────────────────────────────────────────────────────────────
   check-build:
     name: Verify Build Success
     runs-on: ubuntu-latest
@@ -44,9 +41,6 @@ jobs:
           echo "image-tag=${SHA::8}" >> $GITHUB_OUTPUT
           echo "Using image tag: ${SHA::8}"
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # Deploy API and Worker services to staging ECS
-  # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy ${{ matrix.service.name }} to Staging
     runs-on: ubuntu-latest
@@ -80,37 +74,30 @@ jobs:
 
       - name: Deploy ${{ matrix.service.name }} service
         id: deploy
+        env:
+          IMAGE_TAG: ${{ needs.check-build.outputs.image-tag }}
+          DEPLOY_IMAGE: ${{ env.ECR_REGISTRY }}/semkiest-staging/${{ matrix.service.name }}:${{ needs.check-build.outputs.image-tag }}
+          FAMILY: ${{ matrix.service.task_def_family }}
+          CONTAINER: ${{ matrix.service.container_name }}
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ matrix.service.ecs_service }}
         run: |
           set -euo pipefail
-
-          IMAGE_TAG="${{ needs.check-build.outputs.image-tag }}"
-          IMAGE_URI="${{ env.ECR_REGISTRY }}/semkiest-staging/${{ matrix.service.name }}:${IMAGE_TAG}"
-          FAMILY="${{ matrix.service.task_def_family }}"
-          CONTAINER="${{ matrix.service.container_name }}"
-          CLUSTER="${{ env.ECS_CLUSTER }}"
-          SERVICE="${{ matrix.service.ecs_service }}"
-
-          echo "Deploying ${SERVICE} with image: ${IMAGE_URI}"
+          echo "Deploying ${SERVICE} with image: ${DEPLOY_IMAGE}"
 
           # Get current task definition
           TASK_DEF=$(aws ecs describe-task-definition \
             --task-definition "${FAMILY}" \
             --query 'taskDefinition' --output json)
 
-          # Update the container image
-          NEW_TASK_DEF=$(echo "$TASK_DEF" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for c in data.get('containerDefinitions', []):
-    if c['name'] == '${CONTAINER}':
-        c['image'] = '${IMAGE_URI}'
-        break
-for f in ['taskDefinitionArn', 'revision', 'status', 'requiresAttributes',
-          'placementConstraints', 'compatibilities', 'registeredAt',
-          'registeredBy', 'deregisteredAt']:
-    data.pop(f, None)
-print(json.dumps(data))
-")
+          # Update the container image using jq
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+            --arg container "${CONTAINER}" \
+            --arg image "${DEPLOY_IMAGE}" \
+            '(.containerDefinitions[] | select(.name == $container)).image = $image |
+             del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                 .placementConstraints, .compatibilities, .registeredAt,
+                 .registeredBy, .deregisteredAt)')
 
           # Register new task definition
           NEW_TASK_ARN=$(echo "$NEW_TASK_DEF" | aws ecs register-task-definition \
@@ -137,7 +124,6 @@ print(json.dumps(data))
 
           echo "Deploy complete for ${SERVICE}"
 
-  # ─────────────────────────────────────────────────────────────────────────
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
