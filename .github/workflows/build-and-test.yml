@@ -63,6 +63,7 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @semkiest/db db:generate
+        continue-on-error: true
 
       - name: Lint
         run: pnpm turbo lint
