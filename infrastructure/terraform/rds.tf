@@ -16,13 +16,13 @@ resource "random_password" "rds_master" {
 }
 
 # -----------------------------------------------------------------------------
-# Parameter group – PostgreSQL 15 with sensible defaults
+# Parameter group – PostgreSQL 16 with sensible defaults
 # -----------------------------------------------------------------------------
 
 resource "aws_db_parameter_group" "main" {
-  name        = "${local.name_prefix}-pg15"
-  family      = "postgres15"
-  description = "Parameter group for ${local.name_prefix} PostgreSQL 15"
+  name        = "${local.name_prefix}-pg16"
+  family      = "postgres16"
+  description = "Parameter group for ${local.name_prefix} PostgreSQL 16"
 
   parameter {
     name  = "log_connections"
@@ -50,7 +50,7 @@ resource "aws_db_parameter_group" "main" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-pg15"
+    Name = "${local.name_prefix}-pg16"
   }
 
   lifecycle {
