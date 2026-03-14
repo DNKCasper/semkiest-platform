@@ -38,9 +38,12 @@ const pool = new WorkerPool({
 // pool.add('my-queue', async (job) => { ... });
 
 // ── Graceful shutdown ────────────────────────────────────────────────────────
+let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+
 async function shutdown(signal: string): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`[worker] Received ${signal}, shutting down…`);
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
   await pool.closeAll();
   await flushSentry();
   process.exit(0);
@@ -48,6 +51,14 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
+
+// ── Heartbeat — keeps the Node.js event loop alive in ECS ────────────────────
+heartbeatTimer = setInterval(() => {
+  // eslint-disable-next-line no-console
+  console.log(`[worker] Heartbeat [${env.NODE_ENV}] — ${new Date().toISOString()}`);
+}, 60_000);
+
+// Unref is NOT called — we want this timer to keep the process alive.
 
 // eslint-disable-next-line no-console
 console.log(`[worker] Started [${env.NODE_ENV}] — concurrency: ${env.WORKER_CONCURRENCY}`);
