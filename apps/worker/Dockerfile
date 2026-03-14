@@ -9,6 +9,9 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
+# Install OpenSSL for Prisma (required for PostgreSQL connectivity)
+RUN apk add --no-cache openssl
+
 # Copy entire monorepo
 COPY . .
 
@@ -29,7 +32,7 @@ RUN cd packages/db && npx prisma generate && cd /app && \
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init openssl
 
 ENV NODE_ENV=production
 
