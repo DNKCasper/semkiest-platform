@@ -41,6 +41,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     id     = "expire-old-logs"
     status = "Enabled"
 
+    filter {}
+
     expiration {
       days = 90
     }
@@ -118,6 +120,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
     id     = "expire-noncurrent-versions"
     status = "Enabled"
 
+    filter {}
+
     noncurrent_version_expiration {
       noncurrent_days = var.s3_noncurrent_version_expiration_days
     }
@@ -126,6 +130,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
   rule {
     id     = "abort-incomplete-multipart"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -243,6 +249,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
     id     = "expire-noncurrent-versions"
     status = "Enabled"
 
+    filter {}
+
     noncurrent_version_expiration {
       noncurrent_days = var.s3_noncurrent_version_expiration_days
     }
@@ -251,6 +259,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
   rule {
     id     = "transition-old-reports-to-ia"
     status = "Enabled"
+
+    filter {}
 
     transition {
       days          = 30

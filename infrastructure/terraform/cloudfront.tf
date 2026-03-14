@@ -82,17 +82,9 @@ resource "aws_cloudfront_distribution" "main" {
   # TLS/SSL
   # -----------------------------------------------------------------------
   viewer_certificate {
-    # Use ACM certificate when a custom domain is configured
-    dynamic "acm_certificate" {
-      for_each = var.cloudfront_custom_domain != "" && var.cloudfront_acm_certificate_arn != "" ? [1] : []
-      content {
-        acm_certificate_arn      = var.cloudfront_acm_certificate_arn
-        ssl_support_method       = "sni-only"
-        minimum_protocol_version = "TLSv1.2_2021"
-      }
-    }
-
-    # Fall back to CloudFront default certificate when no custom domain is set
+    acm_certificate_arn            = var.cloudfront_custom_domain != "" && var.cloudfront_acm_certificate_arn != "" ? var.cloudfront_acm_certificate_arn : null
+    ssl_support_method             = var.cloudfront_custom_domain != "" && var.cloudfront_acm_certificate_arn != "" ? "sni-only" : null
+    minimum_protocol_version       = var.cloudfront_custom_domain != "" && var.cloudfront_acm_certificate_arn != "" ? "TLSv1.2_2021" : "TLSv1"
     cloudfront_default_certificate = var.cloudfront_custom_domain == ""
   }
 
