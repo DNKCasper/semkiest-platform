@@ -22,6 +22,7 @@ coverage/
 
 # Prisma
 prisma/migrations/
+packages/db/prisma/migrations/*.sql.bak
 
 # IDE
 .idea/
@@ -40,3 +41,17 @@ package-lock.json
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+.terraform.lock.hcl
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
