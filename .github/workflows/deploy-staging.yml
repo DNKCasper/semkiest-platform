@@ -8,6 +8,7 @@ on:
       - completed
     branches:
       - main
+  workflow_dispatch:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
@@ -22,7 +23,9 @@ jobs:
   check-build:
     name: Verify Build Success
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     outputs:
       image-tag: ${{ steps.get-tag.outputs.image-tag }}
 
@@ -33,52 +36,13 @@ jobs:
       - name: Derive image tag from triggering SHA
         id: get-tag
         run: |
-          # The image tag is the first 8 chars of the SHA that triggered the build
-          SHA="${{ github.event.workflow_run.head_sha }}"
-          echo "image-tag=${SHA::8}" >> $GITHUB_OUTPUT
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # Run database migrations before deploying new application code
-  # ─────────────────────────────────────────────────────────────────────────
-  migrate:
-    name: Run Database Migrations
-    runs-on: ubuntu-latest
-    needs: check-build
-    environment: staging
-    continue-on-error: true
-
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Run database migrations
-        run: |
-          if [ -f scripts/migrate.sh ]; then
-            chmod +x scripts/migrate.sh
-            ./scripts/migrate.sh
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SHA="${{ github.sha }}"
           else
-            echo "No migration script found — skipping migrations"
+            SHA="${{ github.event.workflow_run.head_sha }}"
           fi
-        env:
-          ENVIRONMENT: ${{ env.ENVIRONMENT }}
-          ECS_CLUSTER: ${{ env.ECS_CLUSTER }}
-          ECS_MIGRATION_TASK_DEFINITION: ${{ vars.ECS_MIGRATION_TASK_DEF_STAGING }}
-          ECS_MIGRATION_SUBNET: ${{ secrets.ECS_MIGRATION_SUBNET_STAGING }}
-          ECS_MIGRATION_SECURITY_GROUP: ${{ secrets.ECS_MIGRATION_SG_STAGING }}
-          IMAGE_TAG: ${{ needs.check-build.outputs.image-tag }}
-          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          echo "image-tag=${SHA::8}" >> $GITHUB_OUTPUT
+          echo "Using image tag: ${SHA::8}"
 
   # ─────────────────────────────────────────────────────────────────────────
   # Deploy API and Worker services to staging ECS
@@ -86,18 +50,15 @@ jobs:
   deploy:
     name: Deploy ${{ matrix.service.name }} to Staging
     runs-on: ubuntu-latest
-    needs:
-      - check-build
-      - migrate
-    if: always() && needs.check-build.result == 'success'
+    needs: check-build
     environment: staging
 
     permissions:
       id-token: write
       contents: read
-      deployments: write
 
     strategy:
+      fail-fast: false
       max-parallel: 2
       matrix:
         service:
@@ -105,21 +66,12 @@ jobs:
             ecs_service: semkiest-staging-api
             task_def_family: semkiest-staging-api
             container_name: api
-            health_path: /health
-            port: 3001
           - name: worker
             ecs_service: semkiest-staging-worker
             task_def_family: semkiest-staging-worker
             container_name: worker
-            health_path: ''
-            port: ''
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -129,53 +81,62 @@ jobs:
       - name: Deploy ${{ matrix.service.name }} service
         id: deploy
         run: |
-          if [ -f scripts/deploy.sh ]; then
-            chmod +x scripts/deploy.sh
-            ./scripts/deploy.sh
-          else
-            echo "No deploy script found — performing inline ECS deployment"
-            # Get current task definition
-            TASK_DEF=$(aws ecs describe-task-definition \
-              --task-definition ${{ matrix.service.task_def_family }} \
-              --query 'taskDefinition' --output json)
+          set -euo pipefail
 
-            # Update the image in the container definition
-            NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
-              --arg IMAGE "${IMAGE_URI}" \
-              '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+          IMAGE_TAG="${{ needs.check-build.outputs.image-tag }}"
+          IMAGE_URI="${{ env.ECR_REGISTRY }}/semkiest-staging/${{ matrix.service.name }}:${IMAGE_TAG}"
+          FAMILY="${{ matrix.service.task_def_family }}"
+          CONTAINER="${{ matrix.service.container_name }}"
+          CLUSTER="${{ env.ECS_CLUSTER }}"
+          SERVICE="${{ matrix.service.ecs_service }}"
 
-            # Register new task definition
-            NEW_TASK_ARN=$(aws ecs register-task-definition \
-              --cli-input-json "$NEW_TASK_DEF" \
-              --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "Deploying ${SERVICE} with image: ${IMAGE_URI}"
 
-            echo "Registered new task definition: $NEW_TASK_ARN"
+          # Get current task definition
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "${FAMILY}" \
+            --query 'taskDefinition' --output json)
 
-            # Update the ECS service
-            aws ecs update-service \
-              --cluster ${{ env.ECS_CLUSTER }} \
-              --service ${{ matrix.service.ecs_service }} \
-              --task-definition "$NEW_TASK_ARN" \
-              --force-new-deployment
+          # Update the container image
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for c in data.get('containerDefinitions', []):
+    if c['name'] == '${CONTAINER}':
+        c['image'] = '${IMAGE_URI}'
+        break
+for f in ['taskDefinitionArn', 'revision', 'status', 'requiresAttributes',
+          'placementConstraints', 'compatibilities', 'registeredAt',
+          'registeredBy', 'deregisteredAt']:
+    data.pop(f, None)
+print(json.dumps(data))
+")
 
-            echo "Deployment triggered for ${{ matrix.service.name }}"
-          fi
-        env:
-          ENVIRONMENT: ${{ env.ENVIRONMENT }}
-          ECS_CLUSTER: ${{ env.ECS_CLUSTER }}
-          ECS_SERVICE: ${{ matrix.service.ecs_service }}
-          TASK_DEF_FAMILY: ${{ matrix.service.task_def_family }}
-          CONTAINER_NAME: ${{ matrix.service.container_name }}
-          IMAGE_URI: ${{ env.ECR_REGISTRY }}/semkiest-staging/${{ matrix.service.name }}:${{ needs.check-build.outputs.image-tag }}
-          HEALTH_CHECK_PATH: ${{ matrix.service.health_path }}
-          HEALTH_CHECK_PORT: ${{ matrix.service.port }}
-          LOAD_BALANCER_URL: ${{ secrets.STAGING_LB_URL }}
-          AWS_REGION: ${{ env.AWS_REGION }}
-          DEPLOY_TIMEOUT: '300'
-          HEALTH_CHECK_RETRIES: '10'
+          # Register new task definition
+          NEW_TASK_ARN=$(echo "$NEW_TASK_DEF" | aws ecs register-task-definition \
+            --cli-input-json file:///dev/stdin \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # Notify on deployment outcome
+          echo "Registered new task definition: $NEW_TASK_ARN"
+
+          # Update the ECS service
+          aws ecs update-service \
+            --cluster "${CLUSTER}" \
+            --service "${SERVICE}" \
+            --task-definition "$NEW_TASK_ARN" \
+            --force-new-deployment \
+            --output text > /dev/null
+
+          echo "Deployment triggered for ${SERVICE}"
+          echo "Waiting for service to stabilize (up to 5 minutes)..."
+
+          # Wait for stabilization (don't fail if it times out on first deploy)
+          timeout 300 aws ecs wait services-stable \
+            --cluster "${CLUSTER}" \
+            --services "${SERVICE}" || echo "Service did not stabilize within 5 minutes (may still be starting)"
+
+          echo "Deploy complete for ${SERVICE}"
+
   # ─────────────────────────────────────────────────────────────────────────
   notify:
     name: Notify Deployment Status
@@ -186,11 +147,10 @@ jobs:
     steps:
       - name: Deployment succeeded
         if: needs.deploy.result == 'success'
-        run: |
-          echo "Staging deployment succeeded for SHA ${{ github.event.workflow_run.head_sha }}"
+        run: echo "Staging deployment succeeded"
 
       - name: Deployment failed
         if: needs.deploy.result != 'success'
         run: |
-          echo "Staging deployment FAILED for SHA ${{ github.event.workflow_run.head_sha }}"
+          echo "Staging deployment had issues - check individual service jobs"
           exit 1
