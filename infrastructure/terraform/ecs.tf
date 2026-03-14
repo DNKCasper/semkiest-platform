@@ -152,12 +152,6 @@ resource "aws_lb" "main" {
 
   enable_deletion_protection = var.environment == "production"
 
-  access_logs {
-    bucket  = aws_s3_bucket.logs.bucket
-    prefix  = "alb"
-    enabled = true
-  }
-
   tags = {
     Name = "${local.name_prefix}-alb"
   }
