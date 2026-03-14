@@ -45,7 +45,6 @@ jobs:
     name: Deploy ${{ matrix.service.name }} to Staging
     runs-on: ubuntu-latest
     needs: check-build
-    environment: staging
 
     permissions:
       id-token: write
