@@ -72,57 +72,63 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy ${{ matrix.service.name }} service
-        id: deploy
-        env:
-          IMAGE_TAG: ${{ needs.check-build.outputs.image-tag }}
-          DEPLOY_IMAGE: ${{ env.ECR_REGISTRY }}/semkiest-staging/${{ matrix.service.name }}:${{ needs.check-build.outputs.image-tag }}
-          FAMILY: ${{ matrix.service.task_def_family }}
-          CONTAINER: ${{ matrix.service.container_name }}
-          CLUSTER: ${{ env.ECS_CLUSTER }}
-          SERVICE: ${{ matrix.service.ecs_service }}
+      - name: Get current task definition
+        id: get-task-def
         run: |
-          set -euo pipefail
-          echo "Deploying ${SERVICE} with image: ${DEPLOY_IMAGE}"
+          echo "Fetching task definition: ${{ matrix.service.task_def_family }}"
+          aws ecs describe-task-definition \
+            --task-definition "${{ matrix.service.task_def_family }}" \
+            --query 'taskDefinition' --output json > /tmp/task-def.json
+          echo "Current image:"
+          jq -r '.containerDefinitions[0].image' /tmp/task-def.json
 
-          # Get current task definition
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition "${FAMILY}" \
-            --query 'taskDefinition' --output json)
+      - name: Update container image in task definition
+        run: |
+          IMAGE_URI="${{ env.ECR_REGISTRY }}/semkiest-staging/${{ matrix.service.name }}:${{ needs.check-build.outputs.image-tag }}"
+          CONTAINER="${{ matrix.service.container_name }}"
+          echo "Setting image to: ${IMAGE_URI}"
+          echo "For container: ${CONTAINER}"
 
-          # Update the container image using jq
-          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+          jq \
             --arg container "${CONTAINER}" \
-            --arg image "${DEPLOY_IMAGE}" \
+            --arg image "${IMAGE_URI}" \
             '(.containerDefinitions[] | select(.name == $container)).image = $image |
              del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
                  .placementConstraints, .compatibilities, .registeredAt,
-                 .registeredBy, .deregisteredAt)')
+                 .registeredBy, .deregisteredAt)' \
+            /tmp/task-def.json > /tmp/new-task-def.json
 
-          # Register new task definition
-          NEW_TASK_ARN=$(echo "$NEW_TASK_DEF" | aws ecs register-task-definition \
-            --cli-input-json file:///dev/stdin \
+          echo "New task definition container image:"
+          jq -r '.containerDefinitions[0].image' /tmp/new-task-def.json
+
+      - name: Register new task definition
+        id: register
+        run: |
+          NEW_TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/new-task-def.json \
             --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "Registered: ${NEW_TASK_ARN}"
+          echo "task-arn=${NEW_TASK_ARN}" >> $GITHUB_OUTPUT
 
-          echo "Registered new task definition: $NEW_TASK_ARN"
-
-          # Update the ECS service
+      - name: Update ECS service
+        run: |
+          echo "Updating service ${{ matrix.service.ecs_service }} in cluster ${{ env.ECS_CLUSTER }}"
           aws ecs update-service \
-            --cluster "${CLUSTER}" \
-            --service "${SERVICE}" \
-            --task-definition "$NEW_TASK_ARN" \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ matrix.service.ecs_service }}" \
+            --task-definition "${{ steps.register.outputs.task-arn }}" \
             --force-new-deployment \
-            --output text > /dev/null
+            --query 'service.serviceName' --output text
+          echo "Service update triggered"
 
-          echo "Deployment triggered for ${SERVICE}"
-          echo "Waiting for service to stabilize (up to 5 minutes)..."
-
-          # Wait for stabilization (don't fail if it times out on first deploy)
-          timeout 300 aws ecs wait services-stable \
-            --cluster "${CLUSTER}" \
-            --services "${SERVICE}" || echo "Service did not stabilize within 5 minutes (may still be starting)"
-
-          echo "Deploy complete for ${SERVICE}"
+      - name: Wait for service stability
+        continue-on-error: true
+        run: |
+          echo "Waiting for ${{ matrix.service.ecs_service }} to stabilize (up to 5 min)..."
+          aws ecs wait services-stable \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ matrix.service.ecs_service }}" || true
+          echo "Done waiting"
 
   notify:
     name: Notify Deployment Status
