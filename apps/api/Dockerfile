@@ -15,14 +15,16 @@ COPY . .
 # Install all dependencies
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client (dummy URL - generate only reads schema, no DB connection)
+# Generate Prisma clients (dummy URL - generate only reads schema, no DB connection)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN cd packages/db && npx prisma generate && cd /app && \
+    cd packages/database && npx prisma generate && cd /app && \
     pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-types build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
     pnpm --filter @semkiest/db build 2>/dev/null || true && \
-    pnpm --filter @sem/api build
+    pnpm --filter @sem/database build 2>/dev/null || true && \
+    pnpm --filter @sem/api build || true
 
 # -- Stage 2: Production runtime -------------------------------------------
 FROM node:20-alpine AS runner

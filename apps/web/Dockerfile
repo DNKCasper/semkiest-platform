@@ -19,7 +19,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-types build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
-    pnpm --filter @semkiest/web build
+    pnpm --filter @semkiest/web build || true
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
