@@ -183,34 +183,27 @@ resource "aws_lb_target_group" "api" {
   }
 }
 
-# HTTP listener – redirect all to HTTPS
-resource "aws_lb_listener" "http_redirect" {
+# HTTP listener - forward to target group directly (no cert needed for staging)
+resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
   }
 }
 
-# HTTPS listener – forward to API target group
-# NOTE: ACM certificate ARN must be provided via a variable or data source.
-# This resource uses a placeholder; update cloudfront_acm_certificate_arn or
-# add a dedicated ALB certificate variable in production.
+# HTTPS listener - only created when an ACM certificate is provided
 resource "aws_lb_listener" "https" {
+  count = var.cloudfront_acm_certificate_arn != "" ? 1 : 0
+
   load_balancer_arn = aws_lb.main.arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-
-  # Placeholder certificate – replace with a real ACM cert ARN
-  certificate_arn = var.cloudfront_acm_certificate_arn != "" ? var.cloudfront_acm_certificate_arn : null
+  certificate_arn   = var.cloudfront_acm_certificate_arn
 
   default_action {
     type             = "forward"
@@ -218,7 +211,6 @@ resource "aws_lb_listener" "https" {
   }
 
   lifecycle {
-    # Ignore changes to certificate_arn to allow out-of-band cert rotation
     ignore_changes = [certificate_arn]
   }
 }
@@ -399,7 +391,7 @@ resource "aws_ecs_service" "api" {
   }
 
   depends_on = [
-    aws_lb_listener.https,
+    aws_lb_listener.http,
     aws_iam_role_policy_attachment.ecs_task_execution_managed,
   ]
 }
@@ -441,7 +433,7 @@ resource "aws_ecs_service" "worker" {
 }
 
 # -----------------------------------------------------------------------------
-# Auto-scaling – API service (request-based)
+# Auto-scaling - API service (request-based)
 # -----------------------------------------------------------------------------
 
 resource "aws_appautoscaling_target" "api" {
@@ -491,7 +483,7 @@ resource "aws_appautoscaling_policy" "api_memory" {
 }
 
 # -----------------------------------------------------------------------------
-# Auto-scaling – Worker service (queue-depth based)
+# Auto-scaling - Worker service (queue-depth based)
 # -----------------------------------------------------------------------------
 
 resource "aws_appautoscaling_target" "worker" {

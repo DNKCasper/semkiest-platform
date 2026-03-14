@@ -1,5 +1,5 @@
 # =============================================================================
-# SemkiEst Platform – RDS PostgreSQL
+# SemkiEst Platform - RDS PostgreSQL
 # =============================================================================
 # Single-AZ by default (staging); Multi-AZ enabled for production via variable.
 # Credentials are generated with `random_password` and stored in Secrets Manager.
@@ -16,7 +16,7 @@ resource "random_password" "rds_master" {
 }
 
 # -----------------------------------------------------------------------------
-# Parameter group – PostgreSQL 16 with sensible defaults
+# Parameter group - PostgreSQL 16 with sensible defaults
 # -----------------------------------------------------------------------------
 
 resource "aws_db_parameter_group" "main" {
@@ -45,8 +45,9 @@ resource "aws_db_parameter_group" "main" {
   }
 
   parameter {
-    name  = "shared_preload_libraries"
-    value = "pg_stat_statements"
+    name         = "shared_preload_libraries"
+    value        = "pg_stat_statements"
+    apply_method = "pending-reboot"
   }
 
   tags = {
@@ -146,7 +147,7 @@ resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring" {
 }
 
 # -----------------------------------------------------------------------------
-# CloudWatch Alarms – RDS
+# CloudWatch Alarms - RDS
 # -----------------------------------------------------------------------------
 
 resource "aws_cloudwatch_metric_alarm" "rds_cpu_high" {
