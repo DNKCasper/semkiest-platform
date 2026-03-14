@@ -12,8 +12,8 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 # Copy entire monorepo
 COPY . .
 
-# Install all dependencies
-RUN pnpm install --frozen-lockfile
+# Install all dependencies (--no-frozen-lockfile until lockfile is regenerated)
+RUN pnpm install --no-frozen-lockfile
 
 # Generate Prisma clients (dummy URL - generate only reads schema, no DB connection)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
