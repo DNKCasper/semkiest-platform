@@ -1,31 +1,19 @@
 # =============================================================================
-# Web (Next.js) Service Dockerfile — multi-stage build
+# Web (Next.js) Service Dockerfile - multi-stage build
 # Build context must be the monorepo root.
 # =============================================================================
 
-# ── Stage 1: Install all workspace dependencies ───────────────────────────────
-FROM node:20-alpine AS deps
-WORKDIR /app
-
-RUN corepack enable && corepack prepare pnpm@9 --activate
-
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
-COPY apps/web/package.json ./apps/web/
-COPY packages/shared-config/package.json ./packages/shared-config/
-COPY packages/shared-types/package.json ./packages/shared-types/
-COPY packages/shared-utils/package.json ./packages/shared-utils/
-
-RUN pnpm install --frozen-lockfile
-
-
-# ── Stage 2: Build Next.js app ────────────────────────────────────────────
+# -- Stage 1: Build --------------------------------------------------------
 FROM node:20-alpine AS builder
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
-COPY --from=deps /app/node_modules ./node_modules
+# Copy entire monorepo
 COPY . .
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
 
 # Build shared packages then the web app
 RUN pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
@@ -33,11 +21,9 @@ RUN pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
     pnpm --filter @semkiest/web build
 
-# Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-
-# ── Stage 3: Production image (standalone output) ─────────────────────────────
+# -- Stage 2: Production runtime -------------------------------------------
 FROM node:20-alpine AS runner
 WORKDIR /app
 
