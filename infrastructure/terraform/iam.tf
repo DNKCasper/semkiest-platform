@@ -1,10 +1,10 @@
 # =============================================================================
-# SemkiEst Platform – IAM Roles & Policies
+# SemkiEst Platform - IAM Roles & Policies
 # =============================================================================
 # Follows the least-privilege principle:
-#   • ECS task execution role – pull images, write CloudWatch logs, read secrets
-#   • ECS API task role       – S3, Secrets Manager
-#   • ECS worker task role    – S3, Secrets Manager
+#   • ECS task execution role - pull images, write CloudWatch logs, read secrets
+#   • ECS API task role       - S3, Secrets Manager
+#   • ECS worker task role    - S3, Secrets Manager
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -26,7 +26,7 @@ data "aws_iam_policy_document" "ecs_task_execution_assume" {
 resource "aws_iam_role" "ecs_task_execution" {
   name               = "${local.name_prefix}-ecs-task-execution"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_execution_assume.json
-  description        = "ECS task execution role for ${local.name_prefix} – pulls images and writes logs"
+  description        = "ECS task execution role for ${local.name_prefix} - pulls images and writes logs"
 
   tags = {
     Name = "${local.name_prefix}-ecs-task-execution"
@@ -82,7 +82,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
 resource "aws_iam_role" "ecs_api_task" {
   name               = "${local.name_prefix}-ecs-api-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_execution_assume.json
-  description        = "Runtime role for the API ECS task – S3, Secrets Manager"
+  description        = "Runtime role for the API ECS task - S3, Secrets Manager"
 
   tags = {
     Name = "${local.name_prefix}-ecs-api-task"
@@ -90,7 +90,7 @@ resource "aws_iam_role" "ecs_api_task" {
 }
 
 data "aws_iam_policy_document" "ecs_api_task" {
-  # S3 – uploads bucket read/write
+  # S3 - uploads bucket read/write
   statement {
     sid    = "S3Uploads"
     effect = "Allow"
@@ -106,7 +106,7 @@ data "aws_iam_policy_document" "ecs_api_task" {
     ]
   }
 
-  # S3 – artifacts bucket read
+  # S3 - artifacts bucket read
   statement {
     sid    = "S3ArtifactsRead"
     effect = "Allow"
@@ -120,7 +120,7 @@ data "aws_iam_policy_document" "ecs_api_task" {
     ]
   }
 
-  # Secrets Manager – read runtime secrets
+  # Secrets Manager - read runtime secrets
   statement {
     sid    = "SecretsRead"
     effect = "Allow"
@@ -133,7 +133,7 @@ data "aws_iam_policy_document" "ecs_api_task" {
     ]
   }
 
-  # CloudWatch – structured logging from application code
+  # CloudWatch - structured logging from application code
   statement {
     sid    = "CloudWatchLogs"
     effect = "Allow"
@@ -160,7 +160,7 @@ resource "aws_iam_role_policy" "ecs_api_task" {
 resource "aws_iam_role" "ecs_worker_task" {
   name               = "${local.name_prefix}-ecs-worker-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_execution_assume.json
-  description        = "Runtime role for the worker ECS task – S3, Secrets Manager"
+  description        = "Runtime role for the worker ECS task - S3, Secrets Manager"
 
   tags = {
     Name = "${local.name_prefix}-ecs-worker-task"
@@ -168,7 +168,7 @@ resource "aws_iam_role" "ecs_worker_task" {
 }
 
 data "aws_iam_policy_document" "ecs_worker_task" {
-  # S3 – read uploads, write artifacts
+  # S3 - read uploads, write artifacts
   statement {
     sid    = "S3UploadsRead"
     effect = "Allow"

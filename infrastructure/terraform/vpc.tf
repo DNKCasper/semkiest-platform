@@ -1,10 +1,10 @@
 # =============================================================================
-# SemkiEst Platform – VPC & Networking
+# SemkiEst Platform - VPC & Networking
 # =============================================================================
 # Creates a three-tier VPC:
-#   • Public subnets   – ALB, NAT gateways
-#   • Private subnets  – ECS tasks, ElastiCache
-#   • Database subnets – RDS (isolated, no internet route)
+#   • Public subnets   - ALB, NAT gateways
+#   • Private subnets  - ECS tasks, ElastiCache
+#   • Database subnets - RDS (isolated, no internet route)
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -69,7 +69,7 @@ resource "aws_subnet" "private" {
 }
 
 # -----------------------------------------------------------------------------
-# Database Subnets (RDS – no internet route)
+# Database Subnets (RDS - no internet route)
 # -----------------------------------------------------------------------------
 
 resource "aws_subnet" "database" {
@@ -135,7 +135,7 @@ resource "aws_nat_gateway" "main" {
 # Route Tables
 # -----------------------------------------------------------------------------
 
-# Public route table – default route via Internet Gateway
+# Public route table - default route via Internet Gateway
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -156,7 +156,7 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Private route tables – one per AZ (or one shared when single_nat_gateway)
+# Private route tables - one per AZ (or one shared when single_nat_gateway)
 resource "aws_route_table" "private" {
   count  = var.single_nat_gateway ? 1 : length(var.availability_zones)
   vpc_id = aws_vpc.main.id
@@ -198,10 +198,10 @@ resource "aws_route_table_association" "database" {
 # Security Groups
 # -----------------------------------------------------------------------------
 
-# ALB – accepts HTTPS (443) from anywhere; HTTP (80) for redirect only
+# ALB - accepts HTTPS (443) from anywhere; HTTP (80) for redirect only
 resource "aws_security_group" "alb" {
   name        = "${local.name_prefix}-sg-alb"
-  description = "Application Load Balancer – public traffic"
+  description = "Application Load Balancer - public traffic"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -233,10 +233,10 @@ resource "aws_security_group" "alb" {
   }
 }
 
-# API ECS tasks – only reachable from ALB
+# API ECS tasks - only reachable from ALB
 resource "aws_security_group" "ecs_api" {
   name        = "${local.name_prefix}-sg-ecs-api"
-  description = "ECS API tasks – traffic from ALB only"
+  description = "ECS API tasks - traffic from ALB only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -260,10 +260,10 @@ resource "aws_security_group" "ecs_api" {
   }
 }
 
-# Worker ECS tasks – outbound only (pulls from SQS/Redis, no inbound needed)
+# Worker ECS tasks - outbound only (pulls from SQS/Redis, no inbound needed)
 resource "aws_security_group" "ecs_worker" {
   name        = "${local.name_prefix}-sg-ecs-worker"
-  description = "ECS worker tasks – outbound only"
+  description = "ECS worker tasks - outbound only"
   vpc_id      = aws_vpc.main.id
 
   egress {
@@ -279,10 +279,10 @@ resource "aws_security_group" "ecs_worker" {
   }
 }
 
-# RDS PostgreSQL – only reachable from ECS tasks
+# RDS PostgreSQL - only reachable from ECS tasks
 resource "aws_security_group" "rds" {
   name        = "${local.name_prefix}-sg-rds"
-  description = "RDS PostgreSQL – ECS tasks only"
+  description = "RDS PostgreSQL - ECS tasks only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -306,10 +306,10 @@ resource "aws_security_group" "rds" {
   }
 }
 
-# ElastiCache Redis – only reachable from ECS tasks
+# ElastiCache Redis - only reachable from ECS tasks
 resource "aws_security_group" "redis" {
   name        = "${local.name_prefix}-sg-redis"
-  description = "ElastiCache Redis – ECS tasks only"
+  description = "ElastiCache Redis - ECS tasks only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -333,7 +333,7 @@ resource "aws_security_group" "redis" {
   }
 }
 
-# VPC Endpoints – allow private subnets to reach AWS services without NAT
+# VPC Endpoints - allow private subnets to reach AWS services without NAT
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"

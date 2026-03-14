@@ -1,5 +1,5 @@
 # =============================================================================
-# SemkiEst Platform – CloudFront Distribution
+# SemkiEst Platform - CloudFront Distribution
 # =============================================================================
 # Serves static assets from the uploads S3 bucket via CloudFront CDN.
 # Uses Origin Access Control (OAC) for secure S3 access.
@@ -37,7 +37,7 @@ data "aws_cloudfront_origin_request_policy" "cors_s3" {
 
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
-  comment             = "${local.name_prefix} – static assets CDN"
+  comment             = "${local.name_prefix} - static assets CDN"
   default_root_object = ""
   price_class         = var.cloudfront_price_class
   http_version        = "http2and3"
@@ -47,7 +47,7 @@ resource "aws_cloudfront_distribution" "main" {
   aliases = var.cloudfront_custom_domain != "" ? [var.cloudfront_custom_domain] : []
 
   # -----------------------------------------------------------------------
-  # Origin – S3 uploads bucket
+  # Origin - S3 uploads bucket
   # -----------------------------------------------------------------------
   origin {
     domain_name              = aws_s3_bucket.uploads.bucket_regional_domain_name
@@ -88,21 +88,11 @@ resource "aws_cloudfront_distribution" "main" {
     cloudfront_default_certificate = var.cloudfront_custom_domain == ""
   }
 
-  # -----------------------------------------------------------------------
-  # Access logging
-  # -----------------------------------------------------------------------
-  logging_config {
-    bucket          = aws_s3_bucket.logs.bucket_domain_name
-    prefix          = "cloudfront/"
-    include_cookies = false
-  }
-
   tags = {
     Name = "${local.name_prefix}-cloudfront"
   }
 
   depends_on = [
     aws_s3_bucket.uploads,
-    aws_s3_bucket.logs,
   ]
 }
