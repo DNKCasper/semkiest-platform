@@ -54,7 +54,7 @@ ecr_worker_image_uri = "public.ecr.aws/nginx/nginx:latest"
 
 # RDS
 rds_instance_class         = "db.t3.micro"
-rds_engine_version         = "16.4"
+rds_engine_version         = "16.6"
 rds_allocated_storage      = 20
 rds_max_allocated_storage  = 50
 rds_database_name          = "semkiest"
