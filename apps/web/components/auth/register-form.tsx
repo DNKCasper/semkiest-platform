@@ -14,7 +14,7 @@ import { Checkbox } from '../ui/checkbox';
 import { Progress } from '../ui/progress';
 import { useAuth } from '../../hooks/use-auth';
 
-const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MIN_LENGTH = 12;
 
 const registerSchema = z
   .object({
@@ -94,7 +94,7 @@ export function RegisterForm() {
     setServerError(null);
     try {
       await registerUser(values);
-      router.push('/projects');
+      router.push('/auth/verify-email');
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     }
@@ -184,7 +184,7 @@ export function RegisterForm() {
 
         <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {[
-            { re: /.{8,}/, label: '8+ characters' },
+            { re: /.{12,}/, label: '12+ characters' },
             { re: /[A-Z]/, label: 'Uppercase letter' },
             { re: /[a-z]/, label: 'Lowercase letter' },
             { re: /[0-9]/, label: 'Number' },

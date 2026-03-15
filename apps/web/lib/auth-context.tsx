@@ -88,12 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = useCallback(
     async (input: RegisterInput) => {
-      const { user: newUser, tokens } = await authApi.register(input);
-      storeTokens(tokens);
-      setUser(newUser);
-      scheduleRefresh();
+      // Register only — do NOT store tokens or set user.
+      // User must verify email before logging in (SEM-66 flow).
+      await authApi.register(input);
     },
-    [scheduleRefresh],
+    [],
   );
 
   const logout = useCallback(async () => {

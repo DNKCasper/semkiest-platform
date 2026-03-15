@@ -69,15 +69,27 @@ model Organization {
 
 /// A member of an organization who can authenticate and interact with the platform.
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id                String   @id @default(cuid())
+  email             String   @unique
+  /// Display name provided at registration.
+  name              String?
+  /// Short biography for user profile.
+  bio               String?
   /// Foreign key to the owning organization.
-  orgId        String   @map("org_id")
-  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  role         UserRole @default(VIEWER)
-  passwordHash String   @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  orgId             String   @map("org_id")
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role              UserRole @default(VIEWER)
+  passwordHash      String   @map("password_hash")
+  /// Array of previous bcrypt hashes for password-reuse prevention (max 5).
+  previousPasswords String[] @default([]) @map("previous_passwords")
+  /// Whether the user's email address has been verified.
+  emailVerified     Boolean  @default(false) @map("email_verified")
+  /// Timestamp when email was verified.
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  /// Timestamp of most recent successful login.
+  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   notifications Notification[]
 

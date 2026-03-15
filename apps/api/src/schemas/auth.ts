@@ -20,14 +20,21 @@ const passwordSchema = z
   );
 
 /**
- * Zod schema for the POST /api/v1/auth/register request body.
+ * Zod schema for the POST /api/auth/register request body.
+ * Accepts the full payload from the frontend registration form.
  */
 export const RegisterSchema = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
   email: z.string().email('Invalid email address'),
   password: passwordSchema,
+  confirmPassword: z.string().optional(),
+  acceptTerms: z.boolean().optional(),
   role: z.enum(['admin', 'manager', 'viewer']).optional().default('viewer'),
   orgId: z.string().cuid('Invalid organization ID').optional(),
-});
+}).refine(
+  (data) => !data.confirmPassword || data.password === data.confirmPassword,
+  { message: 'Passwords do not match', path: ['confirmPassword'] },
+);
 
 /**
  * Inferred TypeScript type for the register request body.

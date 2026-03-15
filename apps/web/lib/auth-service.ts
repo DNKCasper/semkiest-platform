@@ -129,9 +129,9 @@ export const authApi = {
     });
   },
 
-  /** POST /api/auth/register */
-  register(input: RegisterInput): Promise<LoginResponse> {
-    return authRequest<LoginResponse>('/api/auth/register', {
+  /** POST /api/auth/register — returns message, no auto-login */
+  register(input: RegisterInput): Promise<{ message: string }> {
+    return authRequest<{ message: string }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),
       skipAuth: true,

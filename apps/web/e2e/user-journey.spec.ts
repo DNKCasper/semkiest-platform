@@ -5,7 +5,7 @@ const API_URL =
   'http://semkiest-staging-alb-704833170.us-east-1.elb.amazonaws.com';
 
 test.describe('Full User Journey', () => {
-  test('register → auto-login → see projects page → logout → login again', async ({
+  test('register → verify-email page → login → projects → logout → login again', async ({
     page,
   }) => {
     const timestamp = Date.now();
@@ -25,35 +25,61 @@ test.describe('Full User Journey', () => {
     await page.locator('#acceptTerms').check({ force: true });
     console.log('Step 2: Form filled');
 
-    // ─── Step 3: Submit and expect redirect to /projects ───
+    // ─── Step 3: Submit and expect redirect to verify-email page ───
     await page.locator('button[type="submit"]').click();
-    // Wait for navigation away from register page (cold start can be slow)
-    await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
+    await page.waitForURL('**/auth/verify-email**', { timeout: 20000 }).catch(() => {});
     const postRegisterUrl = page.url();
     console.log(`Step 3: Post-register URL = ${postRegisterUrl}`);
-    expect(postRegisterUrl).toContain('/projects');
+    expect(postRegisterUrl).toContain('/auth/verify-email');
 
-    // ─── Step 4: Verify auth cookie is set (middleware won't redirect us away) ───
+    // ─── Step 4: Verify the verify-email page content ───
+    const pageBody = await page.textContent('body');
+    expect(pageBody?.toLowerCase()).toContain('check your inbox');
+    console.log('Step 4: Verify-email page displayed correctly');
+
+    // ─── Step 5: No tokens should be stored (not auto-logged in) ───
+    const hasTokens = await page.evaluate(() => {
+      const raw = localStorage.getItem('auth_tokens');
+      return !!raw;
+    });
+    console.log(`Step 5: localStorage tokens present = ${hasTokens}`);
+    expect(hasTokens).toBe(false);
+
+    // ─── Step 6: Navigate to login page ───
+    await page.goto('/auth/login');
+    await expect(page.locator('form')).toBeVisible();
+    console.log('Step 6: Login page loaded');
+
+    // ─── Step 7: Login with the registered account ───
+    await page.locator('#email').fill(testEmail);
+    await page.locator('#password').fill(testPassword);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
+    const postLoginUrl = page.url();
+    console.log(`Step 7: Post-login URL = ${postLoginUrl}`);
+    expect(postLoginUrl).toContain('/projects');
+
+    // ─── Step 8: Verify auth cookie is set (middleware won't redirect us away) ───
     const cookies = await page.context().cookies();
     const authCookie = cookies.find((c) => c.name === 'auth_token');
-    console.log(`Step 4: auth_token cookie present = ${!!authCookie}`);
+    console.log(`Step 8: auth_token cookie present = ${!!authCookie}`);
     expect(authCookie).toBeTruthy();
 
-    // ─── Step 5: Verify localStorage has tokens ───
-    const hasTokens = await page.evaluate(() => {
+    // ─── Step 9: Verify localStorage has tokens ───
+    const hasTokensAfterLogin = await page.evaluate(() => {
       const raw = localStorage.getItem('auth_tokens');
       if (!raw) return false;
       const tokens = JSON.parse(raw);
       return !!(tokens.accessToken && tokens.refreshToken && tokens.expiresAt);
     });
-    console.log(`Step 5: localStorage tokens present = ${hasTokens}`);
-    expect(hasTokens).toBe(true);
+    console.log(`Step 9: localStorage tokens present = ${hasTokensAfterLogin}`);
+    expect(hasTokensAfterLogin).toBe(true);
 
-    // ─── Step 6: Projects page renders (even if no projects) ───
+    // ─── Step 10: Projects page renders (even if no projects) ───
     await expect(page.locator('h1').filter({ hasText: 'Projects' })).toBeVisible({ timeout: 10000 });
-    console.log('Step 6: Projects page rendered');
+    console.log('Step 10: Projects page rendered');
 
-    // ─── Step 7: Verify we can call /me API with stored token ───
+    // ─── Step 11: Verify we can call /me API with stored token ───
     const meResponse = await page.evaluate(async (apiUrl) => {
       const raw = localStorage.getItem('auth_tokens');
       if (!raw) return { status: 0, body: 'no tokens' };
@@ -64,12 +90,11 @@ test.describe('Full User Journey', () => {
       const body = await res.json();
       return { status: res.status, body };
     }, API_URL);
-    console.log(`Step 7: /me status = ${meResponse.status}, email = ${(meResponse.body as any)?.email}`);
+    console.log(`Step 11: /me status = ${meResponse.status}, email = ${(meResponse.body as any)?.email}`);
     expect(meResponse.status).toBe(200);
     expect((meResponse.body as any).email).toBe(testEmail);
 
-    // ─── Step 8: Logout ───
-    // Clear auth state (simulate logout since we may not have a logout button on this page)
+    // ─── Step 12: Logout ───
     await page.evaluate(async (apiUrl) => {
       const raw = localStorage.getItem('auth_tokens');
       if (raw) {
@@ -86,39 +111,39 @@ test.describe('Full User Journey', () => {
       localStorage.removeItem('auth_tokens');
       document.cookie = 'auth_token=; path=/; max-age=0';
     }, API_URL);
-    console.log('Step 8: Logged out');
+    console.log('Step 12: Logged out');
 
-    // ─── Step 9: Verify redirect to login when visiting /projects ───
+    // ─── Step 13: Verify redirect to login when visiting /projects ───
     await page.goto('/projects');
     await page.waitForTimeout(2000);
     const afterLogoutUrl = page.url();
-    console.log(`Step 9: After logout, /projects redirects to: ${afterLogoutUrl}`);
+    console.log(`Step 13: After logout, /projects redirects to: ${afterLogoutUrl}`);
     expect(afterLogoutUrl).toContain('/auth/login');
 
-    // ─── Step 10: Login with the registered account ───
+    // ─── Step 14: Login again with the registered account ───
     await page.locator('#email').fill(testEmail);
     await page.locator('#password').fill(testPassword);
     await page.locator('button[type="submit"]').click();
     await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
-    const postLoginUrl = page.url();
-    console.log(`Step 10: Post-login URL = ${postLoginUrl}`);
-    expect(postLoginUrl).toContain('/projects');
+    const postReloginUrl = page.url();
+    console.log(`Step 14: Post-re-login URL = ${postReloginUrl}`);
+    expect(postReloginUrl).toContain('/projects');
 
-    // ─── Step 11: Verify auth is restored ───
-    const hasTokensAfterLogin = await page.evaluate(() => {
+    // ─── Step 15: Verify auth is restored ───
+    const hasTokensAfterRelogin = await page.evaluate(() => {
       const raw = localStorage.getItem('auth_tokens');
       if (!raw) return false;
       const tokens = JSON.parse(raw);
       return !!(tokens.accessToken && tokens.refreshToken);
     });
-    console.log(`Step 11: Tokens after login = ${hasTokensAfterLogin}`);
-    expect(hasTokensAfterLogin).toBe(true);
+    console.log(`Step 15: Tokens after re-login = ${hasTokensAfterRelogin}`);
+    expect(hasTokensAfterRelogin).toBe(true);
   });
 
   test('register with duplicate email shows error', async ({ page }) => {
     const timestamp = Date.now();
     const testEmail = `dup-${timestamp}@semkiest-test.com`;
-    const testPassword = 'DupPass123!';
+    const testPassword = 'DupTestPass123!';
 
     // Register the first time via API
     const regRes = await page.request.post(`${API_URL}/api/auth/register`, {
@@ -152,21 +177,24 @@ test.describe('Full User Journey', () => {
     const testEmail = `persist-${timestamp}@semkiest-test.com`;
     const testPassword = 'PersistPass123!';
 
-    // Register and auto-login via API, then set tokens in browser
-    const regRes = await page.request.post(`${API_URL}/api/auth/register`, {
+    // Register via API then login via API to get tokens
+    await page.request.post(`${API_URL}/api/auth/register`, {
       data: { email: testEmail, password: testPassword, name: 'Persist Test' },
     });
-    const { tokens } = await regRes.json();
+    const loginRes = await page.request.post(`${API_URL}/api/auth/login`, {
+      data: { email: testEmail, password: testPassword },
+    });
+    const { tokens } = await loginRes.json();
 
     // Navigate to a page and inject tokens
     await page.goto('/auth/login');
     await page.evaluate(
-      ({ tokens, apiUrl }) => {
+      ({ tokens }) => {
         localStorage.setItem('auth_tokens', JSON.stringify(tokens));
         const maxAge = Math.floor((tokens.expiresAt - Date.now()) / 1000);
         document.cookie = `auth_token=${tokens.accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
       },
-      { tokens, apiUrl: API_URL },
+      { tokens },
     );
 
     // Now navigate to /projects — should NOT redirect to login
@@ -196,7 +224,6 @@ test.describe('Full User Journey', () => {
     // Middleware reads the cookie and lets us through (it just checks existence, not validity)
     // But the page should eventually detect the invalid token
     console.log(`Invalid token URL: ${url}`);
-    // The page loads but API calls fail — projects page should show error
     const isOnProjects = url.includes('/projects');
     const isOnLogin = url.includes('/auth/login');
     expect(isOnProjects || isOnLogin).toBeTruthy();

@@ -15,28 +15,36 @@ const REFRESH_TOKEN_EXPIRY = '7d';
 
 /**
  * Retrieves the JWT access token secret from the environment.
+ * Falls back to JWT_SECRET with an "access:" prefix if JWT_ACCESS_SECRET is not set.
  *
- * @throws {Error} When JWT_ACCESS_SECRET is not set.
+ * @throws {Error} When neither JWT_ACCESS_SECRET nor JWT_SECRET is set.
  */
 function getAccessSecret(): string {
   const secret = process.env['JWT_ACCESS_SECRET'];
-  if (!secret) {
-    throw new Error('JWT_ACCESS_SECRET environment variable is not set');
-  }
-  return secret;
+  if (secret) return secret;
+
+  // Fall back to JWT_SECRET (injected by ECS via Secrets Manager)
+  const fallback = process.env['JWT_SECRET'];
+  if (fallback) return `access:${fallback}`;
+
+  throw new Error('JWT_ACCESS_SECRET or JWT_SECRET environment variable is not set');
 }
 
 /**
  * Retrieves the JWT refresh token secret from the environment.
+ * Falls back to JWT_SECRET with a "refresh:" prefix if JWT_REFRESH_SECRET is not set.
  *
- * @throws {Error} When JWT_REFRESH_SECRET is not set.
+ * @throws {Error} When neither JWT_REFRESH_SECRET nor JWT_SECRET is set.
  */
 function getRefreshSecret(): string {
   const secret = process.env['JWT_REFRESH_SECRET'];
-  if (!secret) {
-    throw new Error('JWT_REFRESH_SECRET environment variable is not set');
-  }
-  return secret;
+  if (secret) return secret;
+
+  // Fall back to JWT_SECRET (injected by ECS via Secrets Manager)
+  const fallback = process.env['JWT_SECRET'];
+  if (fallback) return `refresh:${fallback}`;
+
+  throw new Error('JWT_REFRESH_SECRET or JWT_SECRET environment variable is not set');
 }
 
 /**

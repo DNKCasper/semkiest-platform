@@ -59,7 +59,7 @@ test.describe('Authentication Pages', () => {
     await page.goto('/auth/register');
     await page.locator('#name').fill('Test User');
     await page.locator('#email').fill('mismatch@test.com');
-    await page.locator('#password').fill('TestPass123!');
+    await page.locator('#password').fill('TestPassword123!');
     await page.locator('#confirmPassword').fill('DifferentPass456!');
     await page.locator('#acceptTerms').check({ force: true });
     await page.locator('button[type="submit"]').click();
@@ -81,7 +81,7 @@ test.describe('Authentication Pages', () => {
     expect(hasStrengthIndicator).toBeTruthy();
   });
 
-  test('register new user and verify redirect', async ({ page }) => {
+  test('register new user redirects to verify-email', async ({ page }) => {
     const timestamp = Date.now();
     const testEmail = `e2e-test-${timestamp}@semkiest-test.com`;
     await page.goto('/auth/register');
@@ -91,15 +91,23 @@ test.describe('Authentication Pages', () => {
     await page.locator('#confirmPassword').fill('TestPassword123!');
     await page.locator('#acceptTerms').check({ force: true });
     await page.locator('button[type="submit"]').click();
-    // Wait for navigation away from register (cold start after deploy can be slow)
-    await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
+    // After registration, user should be redirected to verify-email page
+    await page.waitForURL('**/auth/verify-email**', { timeout: 20000 }).catch(() => {});
     const url = page.url();
     console.log(`Registration result URL: ${url}`);
     const validOutcome =
-      url.includes('/projects') ||
       url.includes('/auth/verify-email') ||
       url.includes('/auth/login');
     expect(validOutcome).toBeTruthy();
+  });
+
+  test('verify-email page renders correctly', async ({ page }) => {
+    await page.goto('/auth/verify-email');
+    const body = await page.textContent('body');
+    expect(body?.toLowerCase()).toContain('check your inbox');
+    expect(body?.toLowerCase()).toContain('verification');
+    const loginLink = page.locator('a[href*="/auth/login"]');
+    await expect(loginLink).toBeVisible();
   });
 
   test('register without accepting terms fails', async ({ page }) => {
@@ -130,11 +138,13 @@ test.describe('Authentication Pages', () => {
       process.env.NEXT_PUBLIC_API_URL ||
       'http://semkiest-staging-alb-704833170.us-east-1.elb.amazonaws.com';
 
+    // Pre-register user via API
     const regRes = await page.request.post(`${API_URL}/api/auth/register`, {
       data: { email: testEmail, password: testPassword, name: 'Login Test' },
     });
     console.log(`Pre-registered user: ${regRes.status()}`);
 
+    // Login via UI
     await page.goto('/auth/login');
     await page.locator('#email').fill(testEmail);
     await page.locator('#password').fill(testPassword);

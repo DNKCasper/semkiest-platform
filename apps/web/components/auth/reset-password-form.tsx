@@ -13,7 +13,7 @@ import { Label } from '../ui/label';
 import { Progress } from '../ui/progress';
 import { authApi } from '../../lib/auth-service';
 
-const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MIN_LENGTH = 12;
 
 const schema = z
   .object({
