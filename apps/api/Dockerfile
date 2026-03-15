@@ -58,16 +58,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-# Run schema safety-net, then Prisma migrations, then start the API server.
-# The safety-net ensures critical columns exist even if a prior migration
-# was recorded as applied but its SQL actually failed.
-# Migration errors are logged but do not prevent the server from starting,
-# so that ECS doesn't endlessly roll back deployments.
-CMD ["sh", "-c", "\
-  echo 'Running schema safety-net...' && \
-  npx prisma db execute --stdin --schema=packages/db/prisma/schema.prisma < packages/db/prisma/ensure-schema.sql \
-  && echo 'Schema safety-net applied successfully' \
-  || echo 'WARNING: Schema safety-net failed (non-fatal)'; \
-  npx prisma migrate deploy --schema=packages/db/prisma/schema.prisma \
-  || echo 'WARNING: Prisma migration failed — server starting anyway'; \
-  node apps/api/dist/server.js"]
+# Run schema safety-net, Prisma migrations, then start the API server.
+# See docker-entrypoint.sh for details.
+CMD ["sh", "apps/api/docker-entrypoint.sh"]
