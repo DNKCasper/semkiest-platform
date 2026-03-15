@@ -2,6 +2,8 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import type { AuthUser, UserRole } from '@sem/shared';
 
+import { verifyAccessToken } from '../utils/jwt.js';
+
 // Augment @fastify/jwt so request.user is typed as AuthUser
 declare module '@fastify/jwt' {
   interface FastifyJWT {
@@ -12,16 +14,36 @@ declare module '@fastify/jwt' {
 
 /**
  * Fastify preHandler that verifies the JWT token and populates request.user.
+ * Uses the same verifyAccessToken() utility as the auth routes so the
+ * signing secret (which includes an "access:" prefix) always matches.
  * Returns 401 when the token is absent or invalid.
  */
 export async function authenticate(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
+  const authHeader = request.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return reply.code(401).send({
+      error: 'Unauthorized',
+      message: 'Invalid or missing authentication token',
+      statusCode: 401,
+    });
+  }
+
   try {
-    await request.jwtVerify();
+    const token = authHeader.slice(7);
+    const decoded = verifyAccessToken(token);
+    // Populate request.user so downstream handlers can access it
+    (request as any).user = {
+      sub: decoded.sub,
+      id: decoded.sub,
+      email: decoded.email,
+      role: decoded.role,
+      orgId: decoded.orgId,
+    };
   } catch {
-    reply.code(401).send({
+    return reply.code(401).send({
       error: 'Unauthorized',
       message: 'Invalid or missing authentication token',
       statusCode: 401,
