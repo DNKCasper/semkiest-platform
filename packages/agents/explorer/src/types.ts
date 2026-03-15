@@ -276,3 +276,128 @@ export interface Logger {
   error(msg: string, ...args: unknown[]): void;
   debug(msg: string, ...args: unknown[]): void;
 }
+
+// ---------------------------------------------------------------------------
+// Site crawling types
+// ---------------------------------------------------------------------------
+
+/**
+ * Configuration for a site crawl operation.
+ *
+ * Controls URL discovery, concurrency, depth, and filtering behavior.
+ */
+export interface CrawlConfig {
+  /** Starting URL for the crawl (absolute, must be valid HTTP/HTTPS). */
+  startUrl: string;
+
+  /** Maximum depth from the starting URL. Defaults to 5. */
+  maxDepth?: number;
+
+  /** Maximum number of pages to crawl before stopping. Defaults to 100. */
+  maxPages?: number;
+
+  /** Number of concurrent browser pages. Defaults to 3. */
+  concurrency?: number;
+
+  /** Per-page navigation timeout in milliseconds. Defaults to 30 000 ms. */
+  timeout?: number;
+
+  /** Regex patterns — only crawl URLs matching at least one. Optional. */
+  includePatterns?: RegExp[];
+
+  /** Regex patterns — skip URLs matching any of these. Optional. */
+  excludePatterns?: RegExp[];
+
+  /** Whether to respect robots.txt directives. Defaults to false. */
+  respectRobotsTxt?: boolean;
+
+  /** Whether to follow links to external domains. Defaults to false. */
+  followExternalLinks?: boolean;
+
+  /** Authentication configuration for crawling protected pages. Optional. */
+  auth?: CrawlAuthOptions;
+}
+
+/**
+ * Metadata about a single page discovered during a crawl.
+ */
+export interface CrawledPage {
+  /** The original URL as discovered on a parent page. */
+  url: string;
+
+  /** Normalized URL (trailing slash, query params removed). */
+  normalizedUrl: string;
+
+  /** Page title from <title> tag or Open Graph. */
+  title: string;
+
+  /** HTTP status code (200, 404, 500, etc.). */
+  statusCode: number;
+
+  /** Content type from HTTP headers (e.g. "text/html"). */
+  contentType: string;
+
+  /** Depth from the starting URL (0 = start page). */
+  depth: number;
+
+  /** All unique links discovered on this page. */
+  links: string[];
+
+  /** Timestamp when the page was crawled. */
+  discoveredAt: Date;
+
+  /** Time taken to load the page (milliseconds). */
+  loadTimeMs: number;
+
+  /** URL of the page that linked to this one (if not the start URL). */
+  parentUrl?: string;
+}
+
+/**
+ * Hierarchical node in a sitemap tree.
+ */
+export interface SitemapNode {
+  /** The page URL. */
+  url: string;
+
+  /** The page title. */
+  title: string;
+
+  /** Depth from the starting URL. */
+  depth: number;
+
+  /** Child pages (pages linked from this page). */
+  children: SitemapNode[];
+}
+
+/**
+ * Complete result of a site crawl operation.
+ */
+export interface CrawlResult {
+  /** All pages discovered during the crawl. */
+  pages: CrawledPage[];
+
+  /** Hierarchical sitemap built from discovered pages. */
+  sitemap: SitemapNode[];
+
+  /** Crawl statistics and summary. */
+  statistics: {
+    /** Total pages crawled (not including skipped/failed). */
+    totalPages: number;
+
+    /** Total unique links found across all pages. */
+    totalLinks: number;
+
+    /** Maximum depth reached during the crawl. */
+    maxDepthReached: number;
+
+    /** Average page load time in milliseconds. */
+    avgLoadTimeMs: number;
+
+    /** Number of pages that failed to load. */
+    errorCount: number;
+
+    /** Total crawl duration in milliseconds. */
+    durationMs: number;
+  };
+}

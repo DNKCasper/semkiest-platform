@@ -1,7 +1,14 @@
 import type { JobsOptions } from 'bullmq';
 
 /** Agent job type identifiers */
-export type AgentJobType = 'explore' | 'spec-read' | 'ui-test' | 'visual-test';
+export type AgentJobType =
+  | 'explore'
+  | 'spec-read'
+  | 'ui-test'
+  | 'visual-test'
+  | 'performance'
+  | 'api-test'
+  | 'coordinate';
 
 /**
  * Job priority levels.
