@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
 import fjwt from '@fastify/jwt';
 
 import { registerRoutes } from './routes';
@@ -7,6 +8,14 @@ const server = Fastify({
   logger: {
     level: process.env.LOG_LEVEL ?? 'info',
   },
+});
+
+// Register CORS - allow all origins in staging, restrict in production
+server.register(cors, {
+  origin: true, // reflect request origin
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 });
 
 // Register JWT plugin
