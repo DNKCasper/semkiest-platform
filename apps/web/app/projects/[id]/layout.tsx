@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import {
@@ -10,6 +11,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { projectsApi } from '../../../lib/api-client';
 
 const navItems = [
   {
@@ -46,6 +48,11 @@ export default function ProjectLayout({
   const params = useParams<{ id: string }>();
   const pathname = usePathname();
   const projectId = params.id;
+  const [projectName, setProjectName] = useState('Project');
+
+  useEffect(() => {
+    projectsApi.get(projectId).then((p) => setProjectName(p.name)).catch(() => {});
+  }, [projectId]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,7 +67,7 @@ export default function ProjectLayout({
             Projects
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-medium">Project Dashboard</span>
+          <span className="text-sm font-medium">{projectName}</span>
         </div>
       </header>
 

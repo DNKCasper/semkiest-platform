@@ -135,11 +135,11 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const { name, description, status } = bodyResult.data;
+      const { name, description, url, status } = bodyResult.data;
       const { orgId } = request.user;
 
       const project = await prisma.project.create({
-        data: { name, description, status, orgId },
+        data: { name, description, url, status, orgId },
       });
 
       return reply.code(201).send({ data: project });

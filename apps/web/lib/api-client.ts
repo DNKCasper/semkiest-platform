@@ -16,6 +16,8 @@ import type {
   OrgReportResponse,
 } from '../types/report';
 
+import { getStoredTokens, isTokenExpired } from './auth-service';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 class ApiClientError extends Error {
@@ -30,12 +32,21 @@ class ApiClientError extends Error {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string>),
+  };
+
+  // Attach auth token if available
+  const tokens = getStoredTokens();
+  if (tokens && !isTokenExpired(tokens)) {
+    headers['Authorization'] = `Bearer ${tokens.accessToken}`;
+  }
+
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -77,24 +88,27 @@ export const projectsApi = {
   },
 
   /** GET /api/projects/:id */
-  get(id: string): Promise<Project> {
-    return request<Project>(`/api/projects/${id}`);
+  async get(id: string): Promise<Project> {
+    const res = await request<{ data: Project }>(`/api/projects/${id}`);
+    return res.data;
   },
 
   /** POST /api/projects */
-  create(input: CreateProjectInput): Promise<Project> {
-    return request<Project>('/api/projects', {
+  async create(input: CreateProjectInput): Promise<Project> {
+    const res = await request<{ data: Project }>('/api/projects', {
       method: 'POST',
       body: JSON.stringify(input),
     });
+    return res.data;
   },
 
   /** PUT /api/projects/:id */
-  update(id: string, input: UpdateProjectInput): Promise<Project> {
-    return request<Project>(`/api/projects/${id}`, {
+  async update(id: string, input: UpdateProjectInput): Promise<Project> {
+    const res = await request<{ data: Project }>(`/api/projects/${id}`, {
       method: 'PUT',
       body: JSON.stringify(input),
     });
+    return res.data;
   },
 
   /** DELETE /api/projects/:id */

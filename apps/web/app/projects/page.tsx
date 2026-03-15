@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Plus, Search, BarChart3 } from 'lucide-react';
+import { Plus, Search, ExternalLink, FolderOpen } from 'lucide-react';
 import { projectsApi } from '../../lib/api-client';
-import type { Project } from '../../types/project';
+import type { Project, CreateProjectInput } from '../../types/project';
 import {
   Card,
   CardContent,
@@ -14,8 +14,18 @@ import {
 } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
-import { formatDate, formatPassRate } from '../../lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../../components/ui/dialog';
+import { formatDate } from '../../lib/utils';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -23,10 +33,18 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Create dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+
+  const loadProjects = useCallback(() => {
     setLoading(true);
     projectsApi
-      .list({ search })
+      .list(search ? { name: search } : {})
       .then((res) => {
         setProjects(res.data);
         setError(null);
@@ -37,16 +55,45 @@ export default function ProjectsPage() {
       .finally(() => setLoading(false));
   }, [search]);
 
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  async function handleCreate() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    setCreateError(null);
+
+    const input: CreateProjectInput = {
+      name: newName.trim(),
+    };
+    if (newDescription.trim()) input.description = newDescription.trim();
+    if (newUrl.trim()) input.url = newUrl.trim();
+
+    try {
+      await projectsApi.create(input);
+      setDialogOpen(false);
+      setNewName('');
+      setNewDescription('');
+      setNewUrl('');
+      loadProjects();
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : 'Failed to create project');
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="container flex items-center justify-between h-14">
           <span className="font-semibold text-lg">SemkiEst</span>
           <Link
-            href="/admin/reports"
+            href="/dashboard"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
-            Admin Reports
+            Dashboard
           </Link>
         </div>
       </header>
@@ -59,10 +106,69 @@ export default function ProjectsPage() {
               Manage your testing projects.
             </p>
           </div>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Project
-          </Button>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create Project</DialogTitle>
+                <DialogDescription>
+                  Add a new project to start running automated tests.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="project-name">Project Name</Label>
+                  <Input
+                    id="project-name"
+                    placeholder="My Web App"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreate();
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="project-url">Target URL</Label>
+                  <Input
+                    id="project-url"
+                    placeholder="https://example.com"
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The URL of the application you want to test.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="project-desc">Description</Label>
+                  <Input
+                    id="project-desc"
+                    placeholder="Optional description..."
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                  />
+                </div>
+                {createError && (
+                  <p className="text-sm text-destructive">{createError}</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={handleCreate}
+                  disabled={!newName.trim() || creating}
+                >
+                  {creating ? 'Creating...' : 'Create Project'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="relative max-w-sm">
@@ -85,8 +191,18 @@ export default function ProjectsPage() {
 
         {!loading && !error && projects.length === 0 && (
           <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No projects found.</p>
+            <CardContent className="py-16 text-center space-y-4">
+              <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground/50" />
+              <div>
+                <p className="font-medium">No projects yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Create your first project to start running automated tests.
+                </p>
+              </div>
+              <Button size="sm" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Project
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -100,14 +216,10 @@ export default function ProjectsPage() {
                     <CardTitle className="text-base">{project.name}</CardTitle>
                     <Badge
                       variant={
-                        project.status === 'active'
-                          ? 'success'
-                          : project.status === 'archived'
-                          ? 'secondary'
-                          : 'outline'
+                        project.status === 'ACTIVE' ? 'default' : 'secondary'
                       }
                     >
-                      {project.status}
+                      {project.status.toLowerCase()}
                     </Badge>
                   </div>
                   {project.description && (
@@ -117,23 +229,15 @@ export default function ProjectsPage() {
                   )}
                 </CardHeader>
                 <CardContent>
+                  {project.url && (
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{project.url}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Pass rate</span>
-                    <span className="font-medium">
-                      {formatPassRate(project.stats.passRate)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm mt-1">
-                    <span className="text-muted-foreground">Last run</span>
-                    <span>
-                      {project.lastRunAt
-                        ? formatDate(project.lastRunAt)
-                        : 'Never'}
-                    </span>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-border flex items-center gap-1.5 text-xs text-primary">
-                    <BarChart3 className="h-3.5 w-3.5" />
-                    View Reports
+                    <span className="text-muted-foreground">Created</span>
+                    <span>{formatDate(project.createdAt)}</span>
                   </div>
                 </CardContent>
               </Card>
