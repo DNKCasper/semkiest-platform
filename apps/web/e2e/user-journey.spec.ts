@@ -50,9 +50,7 @@ test.describe('Full User Journey', () => {
     expect(hasTokens).toBe(true);
 
     // ─── Step 6: Projects page renders (even if no projects) ───
-    await expect(
-      page.locator('h1:has-text("Projects"), text=No projects found, text=Failed to load'),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').filter({ hasText: 'Projects' })).toBeVisible({ timeout: 10000 });
     console.log('Step 6: Projects page rendered');
 
     // ─── Step 7: Verify we can call /me API with stored token ───
