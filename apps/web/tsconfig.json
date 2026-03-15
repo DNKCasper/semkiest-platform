@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@/*": ["./*"],
       "@semkiest/shared-types": ["../../packages/shared-types/src"],
       "@semkiest/shared-utils": ["../../packages/shared-utils/src"],
       "@semkiest/shared-config": ["../../packages/shared-config/src"]
