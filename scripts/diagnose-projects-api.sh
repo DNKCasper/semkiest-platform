@@ -13,155 +13,144 @@ EMAIL="diag-${RUN_ID}@test.com"
 PASSWORD='DiagPassword123!'
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
-pass() { echo -e "${GREEN}✓ PASS${NC} $1"; }
-fail() { echo -e "${RED}✗ FAIL${NC} $1"; echo "  Response: $2"; }
-warn() { echo -e "${YELLOW}⚠ WARN${NC} $1"; }
-header() { echo -e "\n${YELLOW}=== $1 ===${NC}"; }
+pass() { printf "${GREEN}✓ PASS${NC} %s\n" "$1"; }
+fail() { printf "${RED}✗ FAIL${NC} %s\n" "$1"; printf "  Response: %s\n" "$2"; }
+warn() { printf "${YELLOW}⚠ WARN${NC} %s\n" "$1"; }
+header() { printf "\n${YELLOW}=== %s ===${NC}\n" "$1"; }
+
+# Helper: makes a curl request, stores HTTP body in RESP_BODY and status in RESP_CODE.
+# Usage: api_call METHOD URL [DATA]
+api_call() {
+  local method="$1" url="$2" data="${3:-}"
+  local tmpfile
+  tmpfile=$(mktemp)
+  local curl_args=(-s -w "%{http_code}" -X "$method" "$url"
+    -H "Content-Type: application/json")
+  if [ -n "${TOKEN:-}" ]; then
+    curl_args+=(-H "Authorization: Bearer ${TOKEN}")
+  fi
+  if [ -n "$data" ]; then
+    curl_args+=(-d "$data")
+  fi
+  local raw
+  raw=$(curl "${curl_args[@]}")
+  # Last 3 characters are the HTTP status code
+  RESP_CODE="${raw: -3}"
+  RESP_BODY="${raw:0:${#raw}-3}"
+  rm -f "$tmpfile"
+}
+
+# Helper: extract a JSON field using python3
+json_get() {
+  echo "$1" | python3 -c "import sys,json; print(json.load(sys.stdin)$2)" 2>/dev/null || echo ""
+}
 
 # ------------------------------------------------------------------
 header "1. Health Check"
-HEALTH=$(curl -sf "${API}/health" 2>&1) && pass "GET /health → $HEALTH" || fail "GET /health" "$HEALTH"
+HEALTH=$(curl -sf "${API}/health" 2>&1) && pass "GET /health → $HEALTH" || fail "GET /health" "${HEALTH:-connection failed}"
 
 # ------------------------------------------------------------------
 header "2. Register test user"
-REG_RESP=$(curl -s -w "\n%{http_code}" -X POST "${API}/api/auth/register" \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\",\"name\":\"Diag User\"}")
-REG_BODY=$(echo "$REG_RESP" | head -n -1)
-REG_CODE=$(echo "$REG_RESP" | tail -1)
-if [ "$REG_CODE" = "201" ]; then
+api_call POST "${API}/api/auth/register" \
+  "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\",\"name\":\"Diag User\"}"
+if [ "$RESP_CODE" = "201" ]; then
   pass "POST /api/auth/register → 201"
-elif [ "$REG_CODE" = "409" ]; then
+elif [ "$RESP_CODE" = "409" ]; then
   warn "POST /api/auth/register → 409 (user already exists, continuing)"
 else
-  fail "POST /api/auth/register → $REG_CODE" "$REG_BODY"
+  fail "POST /api/auth/register → $RESP_CODE" "$RESP_BODY"
 fi
 
 # ------------------------------------------------------------------
 header "3. Login"
-LOGIN_RESP=$(curl -s -w "\n%{http_code}" -X POST "${API}/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")
-LOGIN_BODY=$(echo "$LOGIN_RESP" | head -n -1)
-LOGIN_CODE=$(echo "$LOGIN_RESP" | tail -1)
-if [ "$LOGIN_CODE" = "200" ]; then
+TOKEN=""  # clear so api_call doesn't send auth header
+api_call POST "${API}/api/auth/login" \
+  "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}"
+if [ "$RESP_CODE" = "200" ]; then
   pass "POST /api/auth/login → 200"
-  TOKEN=$(echo "$LOGIN_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['tokens']['accessToken'])" 2>/dev/null || echo "")
-  ROLE=$(echo "$LOGIN_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['user']['role'])" 2>/dev/null || echo "unknown")
+  TOKEN=$(json_get "$RESP_BODY" "['tokens']['accessToken']")
+  ROLE=$(json_get "$RESP_BODY" "['user']['role']")
   echo "  Token: ${TOKEN:0:20}..."
   echo "  User role: $ROLE"
 else
-  fail "POST /api/auth/login → $LOGIN_CODE" "$LOGIN_BODY"
+  fail "POST /api/auth/login → $RESP_CODE" "$RESP_BODY"
   echo "Cannot proceed without a token. Exiting."
   exit 1
 fi
 
 # ------------------------------------------------------------------
 header "4. GET /api/auth/me"
-ME_RESP=$(curl -s -w "\n%{http_code}" "${API}/api/auth/me" \
-  -H "Authorization: Bearer ${TOKEN}")
-ME_BODY=$(echo "$ME_RESP" | head -n -1)
-ME_CODE=$(echo "$ME_RESP" | tail -1)
-if [ "$ME_CODE" = "200" ]; then
+api_call GET "${API}/api/auth/me"
+if [ "$RESP_CODE" = "200" ]; then
   pass "GET /api/auth/me → 200"
-  echo "  Body: $ME_BODY"
+  echo "  Body: $RESP_BODY"
 else
-  fail "GET /api/auth/me → $ME_CODE" "$ME_BODY"
+  fail "GET /api/auth/me → $RESP_CODE" "$RESP_BODY"
 fi
 
 # ------------------------------------------------------------------
 header "5. GET /api/projects (list)"
-LIST_RESP=$(curl -s -w "\n%{http_code}" "${API}/api/projects" \
-  -H "Authorization: Bearer ${TOKEN}")
-LIST_BODY=$(echo "$LIST_RESP" | head -n -1)
-LIST_CODE=$(echo "$LIST_RESP" | tail -1)
-if [ "$LIST_CODE" = "200" ]; then
+api_call GET "${API}/api/projects"
+if [ "$RESP_CODE" = "200" ]; then
   pass "GET /api/projects → 200"
-  COUNT=$(echo "$LIST_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null || echo "?")
+  COUNT=$(json_get "$RESP_BODY" ".get('data',[]).__len__()")
   echo "  Project count: $COUNT"
 else
-  fail "GET /api/projects → $LIST_CODE" "$LIST_BODY"
+  fail "GET /api/projects → $RESP_CODE" "$RESP_BODY"
 fi
 
 # ------------------------------------------------------------------
 header "6. POST /api/projects (create — name only)"
-CREATE1_RESP=$(curl -s -w "\n%{http_code}" -X POST "${API}/api/projects" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"Diag Name-Only ${RUN_ID}\"}")
-CREATE1_BODY=$(echo "$CREATE1_RESP" | head -n -1)
-CREATE1_CODE=$(echo "$CREATE1_RESP" | tail -1)
-if [ "$CREATE1_CODE" = "201" ]; then
+api_call POST "${API}/api/projects" \
+  "{\"name\":\"Diag Name-Only ${RUN_ID}\"}"
+if [ "$RESP_CODE" = "201" ]; then
   pass "POST /api/projects (name only) → 201"
-  PROJECT_ID=$(echo "$CREATE1_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['id'])" 2>/dev/null || echo "")
+  PROJECT_ID=$(json_get "$RESP_BODY" "['data']['id']")
   echo "  Project ID: $PROJECT_ID"
 else
-  fail "POST /api/projects (name only) → $CREATE1_CODE" "$CREATE1_BODY"
+  fail "POST /api/projects (name only) → $RESP_CODE" "$RESP_BODY"
+  PROJECT_ID=""
 fi
 
 # ------------------------------------------------------------------
 header "7. POST /api/projects (create — all fields)"
-CREATE2_RESP=$(curl -s -w "\n%{http_code}" -X POST "${API}/api/projects" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"Diag Full ${RUN_ID}\",\"url\":\"https://example.com\",\"description\":\"Test with all fields\"}")
-CREATE2_BODY=$(echo "$CREATE2_RESP" | head -n -1)
-CREATE2_CODE=$(echo "$CREATE2_RESP" | tail -1)
-if [ "$CREATE2_CODE" = "201" ]; then
+api_call POST "${API}/api/projects" \
+  "{\"name\":\"Diag Full ${RUN_ID}\",\"url\":\"https://example.com\",\"description\":\"Test with all fields\"}"
+if [ "$RESP_CODE" = "201" ]; then
   pass "POST /api/projects (all fields) → 201"
 else
-  fail "POST /api/projects (all fields) → $CREATE2_CODE" "$CREATE2_BODY"
+  fail "POST /api/projects (all fields) → $RESP_CODE" "$RESP_BODY"
 fi
 
 # ------------------------------------------------------------------
 header "8. POST /api/projects (create — partial URL, no protocol)"
-CREATE3_RESP=$(curl -s -w "\n%{http_code}" -X POST "${API}/api/projects" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"Diag Partial URL ${RUN_ID}\",\"url\":\"example.com\"}")
-CREATE3_BODY=$(echo "$CREATE3_RESP" | head -n -1)
-CREATE3_CODE=$(echo "$CREATE3_RESP" | tail -1)
-if [ "$CREATE3_CODE" = "201" ]; then
+api_call POST "${API}/api/projects" \
+  "{\"name\":\"Diag Partial URL ${RUN_ID}\",\"url\":\"example.com\"}"
+if [ "$RESP_CODE" = "201" ]; then
   pass "POST /api/projects (partial URL) → 201"
 else
-  fail "POST /api/projects (partial URL) → $CREATE3_CODE" "$CREATE3_BODY"
+  fail "POST /api/projects (partial URL) → $RESP_CODE" "$RESP_BODY"
 fi
 
 # ------------------------------------------------------------------
 header "9. GET /api/projects/:id (detail)"
 if [ -n "${PROJECT_ID:-}" ]; then
-  DETAIL_RESP=$(curl -s -w "\n%{http_code}" "${API}/api/projects/${PROJECT_ID}" \
-    -H "Authorization: Bearer ${TOKEN}")
-  DETAIL_BODY=$(echo "$DETAIL_RESP" | head -n -1)
-  DETAIL_CODE=$(echo "$DETAIL_RESP" | tail -1)
-  if [ "$DETAIL_CODE" = "200" ]; then
+  api_call GET "${API}/api/projects/${PROJECT_ID}"
+  if [ "$RESP_CODE" = "200" ]; then
     pass "GET /api/projects/${PROJECT_ID} → 200"
-    echo "  Body: $DETAIL_BODY"
+    echo "  Body: $RESP_BODY"
   else
-    fail "GET /api/projects/${PROJECT_ID} → $DETAIL_CODE" "$DETAIL_BODY"
+    fail "GET /api/projects/${PROJECT_ID} → $RESP_CODE" "$RESP_BODY"
   fi
 else
   warn "Skipped — no project ID from step 6"
 fi
 
 # ------------------------------------------------------------------
-header "10. Check DB columns via creating project without url"
-CREATE4_RESP=$(curl -s -w "\n%{http_code}" -X POST "${API}/api/projects" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"Diag No-URL ${RUN_ID}\"}")
-CREATE4_BODY=$(echo "$CREATE4_RESP" | head -n -1)
-CREATE4_CODE=$(echo "$CREATE4_RESP" | tail -1)
-if [ "$CREATE4_CODE" = "201" ]; then
-  pass "POST /api/projects (no url field at all) → 201"
-else
-  fail "POST /api/projects (no url field at all) → $CREATE4_CODE" "$CREATE4_BODY"
-fi
-
-# ------------------------------------------------------------------
 header "Summary"
-echo "If steps 6-8 fail with 'column url does not exist', the safety-net"
-echo "migration did not run. Check ECS task logs for 'Schema safety-net'."
+echo "If steps 6-8 fail with 'column url does not exist', the ensureDbSchema()"
+echo "safety-net in server.ts did not add the column. Check ECS task logs for"
+echo "'ensureDbSchema' messages."
 echo ""
 echo "If steps 6-8 fail with 403, the role fix did not deploy."
 echo ""
