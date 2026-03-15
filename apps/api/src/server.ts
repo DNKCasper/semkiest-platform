@@ -31,6 +31,12 @@ server.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
+// Log all registered routes on startup for debugging
+server.addHook('onReady', async () => {
+  const routes = server.printRoutes({ commonPrefix: false });
+  server.log.info(`Registered routes:\n${routes}`);
+});
+
 const start = async (): Promise<void> => {
   try {
     const port = Number(process.env.PORT ?? 3001);

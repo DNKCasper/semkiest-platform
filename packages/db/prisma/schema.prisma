@@ -20,6 +20,7 @@ generator client {
 enum UserRole {
   ADMIN
   MANAGER
+  MEMBER
   VIEWER
 }
 

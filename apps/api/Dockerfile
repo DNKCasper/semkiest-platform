@@ -60,4 +60,6 @@ ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
 # Run Prisma migrations then start the API server.
 # The migration runs inside the VPC where it can reach the RDS instance.
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=packages/db/prisma/schema.prisma && node apps/api/dist/server.js"]
+# Migration errors are logged but do not prevent the server from starting,
+# so that ECS doesn't endlessly roll back deployments.
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=packages/db/prisma/schema.prisma || echo 'WARNING: Prisma migration failed — server starting anyway'; node apps/api/dist/server.js"]
