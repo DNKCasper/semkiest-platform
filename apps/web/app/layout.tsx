@@ -3,7 +3,7 @@ import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 
 export const metadata: Metadata = {
-  title: 'SemkiEst — Testing Platform',
+  title: 'SemkiEst \u2014 Testing Platform',
   description: 'Organization-wide quality metrics and testing dashboard',
 };
 
