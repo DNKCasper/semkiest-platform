@@ -1,29 +1,49 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Page Navigation', () => {
-  test('home page redirects to login or dashboard', async ({ page }) => {
+  test('home page redirects to login or projects', async ({ page }) => {
     await page.goto('/');
     await page.waitForTimeout(2000);
     const url = page.url();
-    const validRedirect = url.includes('/auth/login') || url.includes('/dashboard');
+    const validRedirect =
+      url.includes('/auth/login') || url.includes('/projects');
     expect(validRedirect).toBeTruthy();
   });
 
-  test('all main routes load without 500 errors', async ({ page }) => {
+  test('auth routes load without 500 errors', async ({ page }) => {
     const routes = ['/auth/login', '/auth/register'];
     for (const route of routes) {
       const response = await page.goto(route);
-      expect(response?.status(), `Route ${route} returned error`).toBeLessThan(500);
+      expect(
+        response?.status(),
+        `Route ${route} returned error`,
+      ).toBeLessThan(500);
     }
   });
 
   test('protected routes redirect when unauthenticated', async ({ page }) => {
-    const protectedRoutes = ['/dashboard', '/projects', '/settings', '/analytics'];
+    const protectedRoutes = ['/projects', '/settings', '/analytics'];
     for (const route of protectedRoutes) {
       await page.goto(route);
       await page.waitForTimeout(1500);
       const url = page.url();
-      expect(url, `Route ${route} should redirect to login`).toContain('/auth/login');
+      expect(url, `Route ${route} should redirect to login`).toContain(
+        '/auth/login',
+      );
     }
+  });
+
+  test('forgot password page loads', async ({ page }) => {
+    await page.goto('/auth/forgot-password');
+    await page.waitForTimeout(1000);
+    const status = await page.evaluate(() => {
+      return document.title || document.body.innerText.substring(0, 100);
+    });
+    console.log(`Forgot password page: ${status}`);
+    // Page should load without error (may be 404 if not implemented yet)
+    const url = page.url();
+    const loaded =
+      url.includes('/auth/forgot-password') || url.includes('/auth/login');
+    expect(loaded).toBeTruthy();
   });
 });

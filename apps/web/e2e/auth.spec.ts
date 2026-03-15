@@ -4,67 +4,156 @@ test.describe('Authentication Pages', () => {
   test('login page loads and renders form', async ({ page }) => {
     await page.goto('/auth/login');
     await expect(page.locator('form')).toBeVisible();
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]');
-    const passwordInput = page.locator('input[type="password"]');
-    await expect(emailInput).toBeVisible();
-    await expect(passwordInput).toBeVisible();
-    const loginButton = page.locator('button[type="submit"], button:has-text("Sign In"), button:has-text("Log In")');
-    await expect(loginButton).toBeVisible();
+    await expect(page.locator('#email')).toBeVisible();
+    await expect(page.locator('#password')).toBeVisible();
+    const signInButton = page.locator('button[type="submit"]');
+    await expect(signInButton).toBeVisible();
+    await expect(signInButton).toHaveText(/sign in/i);
   });
 
   test('login page has link to register', async ({ page }) => {
     await page.goto('/auth/login');
-    const registerLink = page.locator('a[href*="register"], a[href*="signup"], a:has-text("Sign Up"), a:has-text("Register"), a:has-text("Create")');
+    const registerLink = page.locator('a[href*="/auth/register"]');
     await expect(registerLink).toBeVisible();
+    await expect(registerLink).toHaveText(/sign up/i);
   });
 
   test('register page loads and renders form', async ({ page }) => {
     await page.goto('/auth/register');
     await expect(page.locator('form')).toBeVisible();
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]');
-    const passwordInput = page.locator('input[type="password"]').first();
-    await expect(emailInput).toBeVisible();
-    await expect(passwordInput).toBeVisible();
+    await expect(page.locator('#name')).toBeVisible();
+    await expect(page.locator('#email')).toBeVisible();
+    await expect(page.locator('#password')).toBeVisible();
+    await expect(page.locator('#confirmPassword')).toBeVisible();
+    await expect(page.locator('#acceptTerms')).toBeAttached();
+    const createButton = page.locator('button[type="submit"]');
+    await expect(createButton).toBeVisible();
+    await expect(createButton).toHaveText(/create account/i);
+  });
+
+  test('register page has link to login', async ({ page }) => {
+    await page.goto('/auth/register');
+    const loginLink = page.locator('a[href*="/auth/login"]');
+    await expect(loginLink).toBeVisible();
+    await expect(loginLink).toHaveText(/sign in/i);
   });
 
   test('login with invalid credentials shows error', async ({ page }) => {
     await page.goto('/auth/login');
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]');
-    const passwordInput = page.locator('input[type="password"]');
-    const loginButton = page.locator('button[type="submit"], button:has-text("Sign In"), button:has-text("Log In")');
-    await emailInput.fill('nonexistent@test.com');
-    await passwordInput.fill('wrongpassword123');
-    await loginButton.click();
+    await page.locator('#email').fill('nonexistent@test.com');
+    await page.locator('#password').fill('wrongpassword123');
+    await page.locator('button[type="submit"]').click();
+    // Should stay on login page and show an error message
     await page.waitForTimeout(3000);
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toBeTruthy();
+    const url = page.url();
+    expect(url).toContain('/auth/login');
+    // Look for error text in the page
+    const body = await page.textContent('body');
+    const hasErrorIndicator =
+      body?.toLowerCase().includes('invalid') ||
+      body?.toLowerCase().includes('error') ||
+      body?.toLowerCase().includes('incorrect') ||
+      body?.toLowerCase().includes('failed');
+    expect(hasErrorIndicator).toBeTruthy();
   });
 
-  test('register new user and verify response', async ({ page }) => {
+  test('register with mismatched passwords shows error', async ({ page }) => {
+    await page.goto('/auth/register');
+    await page.locator('#name').fill('Test User');
+    await page.locator('#email').fill('mismatch@test.com');
+    await page.locator('#password').fill('TestPass123!');
+    await page.locator('#confirmPassword').fill('DifferentPass456!');
+    await page.locator('#acceptTerms').check({ force: true });
+    await page.locator('button[type="submit"]').click();
+    await page.waitForTimeout(2000);
+    // Should stay on register page - passwords don't match
+    const url = page.url();
+    expect(url).toContain('/auth/register');
+  });
+
+  test('register with weak password shows requirements', async ({ page }) => {
+    await page.goto('/auth/register');
+    await page.locator('#password').fill('weak');
+    await page.waitForTimeout(500);
+    // Password strength indicator or requirements should be visible
+    const body = await page.textContent('body');
+    const hasStrengthIndicator =
+      body?.toLowerCase().includes('character') ||
+      body?.toLowerCase().includes('uppercase') ||
+      body?.toLowerCase().includes('number') ||
+      body?.toLowerCase().includes('weak');
+    expect(hasStrengthIndicator).toBeTruthy();
+  });
+
+  test('register new user and verify redirect', async ({ page }) => {
     const timestamp = Date.now();
     const testEmail = `e2e-test-${timestamp}@semkiest-test.com`;
     await page.goto('/auth/register');
-    const nameInput = page.locator('input[name="name"], input[placeholder*="name" i]');
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]');
-    const passwordInput = page.locator('input[type="password"], input[name="password"]').first();
-    const confirmPasswordInput = page.locator('input[name="confirmPassword"], input[placeholder*="confirm" i]');
-    if (await nameInput.isVisible()) await nameInput.fill('E2E Test User');
-    await emailInput.fill(testEmail);
-    await passwordInput.fill('TestPassword123!');
-    if (await confirmPasswordInput.isVisible()) await confirmPasswordInput.fill('TestPassword123!');
-    const termsCheckbox = page.locator('input[type="checkbox"], [role="checkbox"]');
-    if (await termsCheckbox.isVisible()) await termsCheckbox.click();
-    const submitButton = page.locator('button[type="submit"]');
-    await submitButton.click();
+    await page.locator('#name').fill('E2E Test User');
+    await page.locator('#email').fill(testEmail);
+    await page.locator('#password').fill('TestPassword123!');
+    await page.locator('#confirmPassword').fill('TestPassword123!');
+    await page.locator('#acceptTerms').check({ force: true });
+    await page.locator('button[type="submit"]').click();
+    // After successful registration, should redirect to verify-email page
     await page.waitForTimeout(5000);
     const url = page.url();
-    console.log(`Registration result - URL: ${url}`);
+    console.log(`Registration result URL: ${url}`);
+    const validOutcome =
+      url.includes('/auth/verify-email') ||
+      url.includes('/projects') ||
+      url.includes('/auth/login');
+    expect(validOutcome).toBeTruthy();
+  });
+
+  test('register without accepting terms fails', async ({ page }) => {
+    await page.goto('/auth/register');
+    await page.locator('#name').fill('No Terms User');
+    await page.locator('#email').fill('noterms@test.com');
+    await page.locator('#password').fill('TestPassword123!');
+    await page.locator('#confirmPassword').fill('TestPassword123!');
+    // Do NOT check the terms checkbox
+    const submitButton = page.locator('button[type="submit"]');
+    // Button might be disabled or form won't submit
+    await submitButton.click({ force: true });
+    await page.waitForTimeout(2000);
+    // Should stay on register page
+    const url = page.url();
+    expect(url).toContain('/auth/register');
   });
 
   test('unauthenticated user is redirected to login', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/projects');
     await page.waitForTimeout(2000);
     const url = page.url();
     expect(url).toContain('/auth/login');
+  });
+
+  test('login with valid credentials redirects to projects', async ({ page }) => {
+    // First register a user via API
+    const timestamp = Date.now();
+    const testEmail = `e2e-login-${timestamp}@semkiest-test.com`;
+    const testPassword = 'TestPassword123!';
+    const API_URL =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://semkiest-staging-alb-704833170.us-east-1.elb.amazonaws.com';
+
+    const regRes = await page.request.post(`${API_URL}/api/auth/register`, {
+      data: { email: testEmail, password: testPassword, name: 'Login Test' },
+    });
+    console.log(`Pre-registered user: ${regRes.status()}`);
+
+    // Now test login via UI
+    await page.goto('/auth/login');
+    await page.locator('#email').fill(testEmail);
+    await page.locator('#password').fill(testPassword);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForTimeout(5000);
+    const url = page.url();
+    console.log(`Login result URL: ${url}`);
+    // Should redirect to /projects after login
+    const validOutcome =
+      url.includes('/projects') || url.includes('/dashboard');
+    expect(validOutcome).toBeTruthy();
   });
 });
