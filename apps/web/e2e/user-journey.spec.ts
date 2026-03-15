@@ -27,7 +27,8 @@ test.describe('Full User Journey', () => {
 
     // ─── Step 3: Submit and expect redirect to /projects ───
     await page.locator('button[type="submit"]').click();
-    await page.waitForTimeout(5000);
+    // Wait for navigation away from register page (cold start can be slow)
+    await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
     const postRegisterUrl = page.url();
     console.log(`Step 3: Post-register URL = ${postRegisterUrl}`);
     expect(postRegisterUrl).toContain('/projects');
@@ -100,7 +101,7 @@ test.describe('Full User Journey', () => {
     await page.locator('#email').fill(testEmail);
     await page.locator('#password').fill(testPassword);
     await page.locator('button[type="submit"]').click();
-    await page.waitForTimeout(5000);
+    await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
     const postLoginUrl = page.url();
     console.log(`Step 10: Post-login URL = ${postLoginUrl}`);
     expect(postLoginUrl).toContain('/projects');

@@ -91,25 +91,15 @@ test.describe('Authentication Pages', () => {
     await page.locator('#confirmPassword').fill('TestPassword123!');
     await page.locator('#acceptTerms').check({ force: true });
     await page.locator('button[type="submit"]').click();
-    await page.waitForTimeout(5000);
+    // Wait for navigation away from register (cold start after deploy can be slow)
+    await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
     const url = page.url();
     console.log(`Registration result URL: ${url}`);
     const validOutcome =
-      url.includes('/auth/verify-email') ||
       url.includes('/projects') ||
-      url.includes('/auth/login') ||
-      url.includes('/auth/register');
+      url.includes('/auth/verify-email') ||
+      url.includes('/auth/login');
     expect(validOutcome).toBeTruthy();
-    if (url.includes('/auth/register')) {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL ||
-        'http://semkiest-staging-alb-704833170.us-east-1.elb.amazonaws.com';
-      const verifyRes = await page.request.post(`${API_URL}/api/auth/login`, {
-        data: { email: testEmail, password: 'TestPassword123!' },
-      });
-      expect(verifyRes.status()).toBe(200);
-      console.log('User was registered successfully (verified via API login)');
-    }
   });
 
   test('register without accepting terms fails', async ({ page }) => {
