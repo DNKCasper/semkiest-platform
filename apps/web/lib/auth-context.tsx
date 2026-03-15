@@ -86,9 +86,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [scheduleRefresh],
   );
 
-  const register = useCallback(async (input: RegisterInput) => {
-    await authApi.register(input);
-  }, []);
+  const register = useCallback(
+    async (input: RegisterInput) => {
+      const { user: newUser, tokens } = await authApi.register(input);
+      storeTokens(tokens);
+      setUser(newUser);
+      scheduleRefresh();
+    },
+    [scheduleRefresh],
+  );
 
   const logout = useCallback(async () => {
     try {

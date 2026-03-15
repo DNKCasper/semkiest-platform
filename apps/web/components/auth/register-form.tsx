@@ -94,7 +94,7 @@ export function RegisterForm() {
     setServerError(null);
     try {
       await registerUser(values);
-      router.push('/auth/verify-email');
+      router.push('/projects');
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     }
