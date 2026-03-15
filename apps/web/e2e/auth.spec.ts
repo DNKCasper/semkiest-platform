@@ -139,7 +139,7 @@ test.describe('Authentication Pages', () => {
     await page.locator('#email').fill(testEmail);
     await page.locator('#password').fill(testPassword);
     await page.locator('button[type="submit"]').click();
-    await page.waitForTimeout(5000);
+    await page.waitForURL('**/projects**', { timeout: 20000 }).catch(() => {});
     const url = page.url();
     console.log(`Login result URL: ${url}`);
     const validOutcome =
