@@ -55,6 +55,8 @@ model Project {
   id           String        @id @default(cuid())
   name         String
   description  String?
+  /// Target URL for the project under test.
+  url          String?
   status       ProjectStatus @default(ACTIVE)
   orgId        String        @map("org_id")
   organization Organization  @relation(fields: [orgId], references: [id])

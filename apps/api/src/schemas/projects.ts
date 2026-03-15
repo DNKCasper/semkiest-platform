@@ -18,7 +18,16 @@ export const ListProjectsQuerySchema = z.object({
 export const CreateProjectBodySchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
-  url: z.string().url().max(2048).optional(),
+  url: z
+    .string()
+    .max(2048)
+    .optional()
+    .transform((v) => {
+      if (!v || v.trim() === '') return undefined;
+      // Auto-prepend https:// if no protocol is specified
+      if (!/^https?:\/\//i.test(v)) return `https://${v}`;
+      return v;
+    }),
   status: z.enum(['ACTIVE', 'ARCHIVED']).default('ACTIVE'),
 });
 
@@ -26,7 +35,17 @@ export const UpdateProjectBodySchema = z
   .object({
     name: z.string().min(1).max(255).optional(),
     description: z.string().max(1000).nullable().optional(),
-    url: z.string().url().max(2048).nullable().optional(),
+    url: z
+      .string()
+      .max(2048)
+      .nullable()
+      .optional()
+      .transform((v) => {
+        if (v === null || v === undefined) return v;
+        if (v.trim() === '') return null;
+        if (!/^https?:\/\//i.test(v)) return `https://${v}`;
+        return v;
+      }),
     status: z.enum(['ACTIVE', 'ARCHIVED']).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {

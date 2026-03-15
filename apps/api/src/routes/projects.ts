@@ -172,7 +172,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
   /** POST /projects — create a new project */
   fastify.post(
     '/projects',
-    { preHandler: [authenticate, requireRole(...MANAGER_ROLES)] },
+    { preHandler: [authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!prisma) {
         return reply.code(503).send({

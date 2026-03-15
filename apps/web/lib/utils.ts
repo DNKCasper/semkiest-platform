@@ -16,6 +16,19 @@ export function formatDate(dateStr: string | Date): string {
   });
 }
 
+/** Format a date+time string for display. */
+export function formatDateTime(dateStr: string | Date): string {
+  const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 /** Format a pass rate (0-1) as a percentage string. */
 export function formatPassRate(rate: number | undefined | null): string {
   if (rate == null) return '—';
