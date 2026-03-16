@@ -26,6 +26,7 @@ RUN cd packages/db && npx prisma generate && cd /app && \
     pnpm --filter @semkiest/shared-types build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
     pnpm --filter @semkiest/db build 2>/dev/null || true && \
+    pnpm --filter @semkiest/coordinator build 2>/dev/null || true && \
     pnpm --filter @semkiest/worker build || true
 
 # -- Stage 2: Production runtime -------------------------------------------
