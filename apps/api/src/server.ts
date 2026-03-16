@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import fjwt from '@fastify/jwt';
 
 import { registerRoutes } from './routes';
+import { wsPlugin } from './routes/ws-runs';
 
 const server = Fastify({
   logger: {
@@ -25,6 +26,9 @@ server.register(fjwt, {
 
 // Register all API routes
 registerRoutes(server);
+
+// Register WebSocket plugin
+server.register(wsPlugin);
 
 // Health check
 server.get('/health', async () => {

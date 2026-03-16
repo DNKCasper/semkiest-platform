@@ -10,9 +10,14 @@ import {
   ExternalLink,
   Calendar,
   Globe,
+  Settings2,
+  Play,
 } from 'lucide-react';
 import { projectsApi } from '../../../lib/api-client';
+import { profilesApi } from '../../../lib/profiles-api-client';
+import { runsApi } from '../../../lib/runs-api-client';
 import type { Project } from '../../../types/project';
+import type { TestProfile, TriggerRunInput } from '../../../types/run';
 import {
   Card,
   CardContent,
@@ -23,12 +28,15 @@ import {
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
 import { formatDate } from '../../../lib/utils';
+import { RunTrigger } from '../../../components/run/run-trigger';
 
 export default function ProjectOverviewPage() {
   const params = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<TestProfile[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
@@ -44,12 +52,38 @@ export default function ProjectOverviewPage() {
       .finally(() => setLoading(false));
   }, [params.id]);
 
+  useEffect(() => {
+    if (!project) return;
+    setProfilesLoading(true);
+    profilesApi
+      .list(project.id)
+      .then((res) =>
+        setProfiles(
+          res.data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            categories: p.categories || [],
+            settings: p.settings || (p as any).config || {},
+            isDefault: p.isDefault,
+          }))
+        )
+      )
+      .catch(() => {})
+      .finally(() => setProfilesLoading(false));
+  }, [project]);
+
+  async function handleTriggerRun(input: TriggerRunInput) {
+    await runsApi.trigger(project!.id, input);
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-48 bg-muted animate-pulse rounded" />
         <div className="h-4 w-64 bg-muted animate-pulse rounded" />
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="h-40 bg-muted animate-pulse rounded-lg" />
           <div className="h-40 bg-muted animate-pulse rounded-lg" />
           <div className="h-40 bg-muted animate-pulse rounded-lg" />
         </div>
@@ -130,8 +164,48 @@ export default function ProjectOverviewPage() {
         </Card>
       </div>
 
+      {/* Run Test */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Play className="h-4 w-4" />
+            Run Test
+          </CardTitle>
+          <CardDescription>
+            Select a test profile and trigger a new test run.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RunTrigger
+            profiles={profiles}
+            projectName={project.name}
+            isLoadingProfiles={profilesLoading}
+            onTrigger={handleTriggerRun}
+          />
+        </CardContent>
+      </Card>
+
       {/* Quick actions */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Settings2 className="h-4 w-4" />
+              Test Profiles
+            </CardTitle>
+            <CardDescription>
+              Configure test profiles and categories.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/projects/${project.id}/profiles`}>
+                Manage Profiles <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">

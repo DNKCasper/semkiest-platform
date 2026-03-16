@@ -3,8 +3,10 @@ import type {
   RunListResponse,
   RunQueryParams,
   RunTrendResponse,
+  TriggerRunInput,
 } from '../types/run';
 import type { ApiError } from '../types/project';
+import { getStoredTokens, isTokenExpired } from './auth-service';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -20,12 +22,21 @@ export class RunsApiClientError extends Error {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string>),
+  };
+
+  // Attach auth token if available
+  const tokens = getStoredTokens();
+  if (tokens && !isTokenExpired(tokens)) {
+    headers['Authorization'] = `Bearer ${tokens.accessToken}`;
+  }
+
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -81,5 +92,13 @@ export const runsApi = {
     return request<RunTrendResponse>(
       `/api/projects/${projectId}/runs/trend`,
     );
+  },
+
+  /** POST /api/projects/:projectId/runs — trigger a new test run */
+  trigger(projectId: string, input: TriggerRunInput): Promise<TestRun> {
+    return request<TestRun>(`/api/projects/${projectId}/runs`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
   },
 };

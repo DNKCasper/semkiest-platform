@@ -34,8 +34,17 @@ const pool = new WorkerPool({
   },
 });
 
-// ── Queue registrations go here ──────────────────────────────────────────────
-// pool.add('my-queue', async (job) => { ... });
+// ── Queue registrations ──────────────────────────────────────────────────────
+
+// Register the scheduled-test queue processor.
+// This handles cron-triggered test runs from the scheduling engine.
+import { createSchedulerWorker } from './workers/scheduler.worker';
+const schedulerWorker = createSchedulerWorker(
+  { host: redisHost, port: redisPort },
+  Number(env.WORKER_CONCURRENCY) || 5,
+);
+
+console.log('[worker] Registered scheduler queue processor');
 
 // ── Graceful shutdown ────────────────────────────────────────────────────────
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
@@ -44,6 +53,7 @@ async function shutdown(signal: string): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`[worker] Received ${signal}, shutting down…`);
   if (heartbeatTimer) clearInterval(heartbeatTimer);
+  await schedulerWorker.close();
   await pool.closeAll();
   await flushSentry();
   process.exit(0);

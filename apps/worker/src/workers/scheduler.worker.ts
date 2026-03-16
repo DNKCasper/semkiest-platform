@@ -118,19 +118,98 @@ async function processScheduledTestJob(
 }
 
 // =============================================================================
-// Test execution stub
+// Test execution — creates a real TestRun and enqueues the coordinate job
 // =============================================================================
 
 /**
- * Placeholder test runner — replace with real orchestration logic.
- * Simulates a successful 1-second test run.
+ * Creates a TestRun for the project, optionally pulling the test profile
+ * from the schedule's metadata, and returns once the run is created.
+ *
+ * The actual test orchestration is handled by the coordinate queue worker
+ * (if available) or directly via the API. The ScheduleRun record provides
+ * the link between the schedule and the test run.
  */
 async function runTestsForProject(projectId: string, scheduleId: string): Promise<void> {
   console.info(
     `[scheduler-worker] Executing tests for project=${projectId} schedule=${scheduleId}`,
   );
-  // Stub: simulate async work
-  await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+
+  // Fetch the schedule to get any metadata (e.g. profileId override)
+  const schedule = await prisma.schedule.findUnique({
+    where: { id: scheduleId },
+    select: { metadata: true },
+  });
+
+  // Determine the test profile to use:
+  //  1. From schedule metadata if specified
+  //  2. Otherwise pick the first profile belonging to the project
+  let profileId: string | undefined;
+
+  const meta = schedule?.metadata as Record<string, unknown> | null;
+  if (meta && typeof meta['profileId'] === 'string') {
+    profileId = meta['profileId'] as string;
+  }
+
+  if (!profileId) {
+    const firstProfile = await prisma.testProfile.findFirst({
+      where: { projectId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    profileId = firstProfile?.id;
+  }
+
+  if (!profileId) {
+    throw new Error(`No test profile found for project ${projectId}. Create a profile first.`);
+  }
+
+  // Create a TestRun in PENDING status
+  const testRun = await prisma.testRun.create({
+    data: {
+      testProfileId: profileId,
+      status: 'PENDING',
+    },
+  });
+
+  console.info(
+    `[scheduler-worker] Created TestRun ${testRun.id} for profile=${profileId} schedule=${scheduleId}`,
+  );
+
+  // Mark the run as RUNNING
+  await prisma.testRun.update({
+    where: { id: testRun.id },
+    data: {
+      status: 'RUNNING',
+      startedAt: new Date(),
+    },
+  });
+
+  // Try to enqueue a coordinate job if the queue infrastructure is available.
+  // This is a best-effort integration — if BullMQ queues aren't reachable from
+  // the worker context we just mark the run as needing manual processing.
+  try {
+    const { enqueueCoordinateJob } = await import('../queue');
+    if (typeof enqueueCoordinateJob === 'function') {
+      await enqueueCoordinateJob({
+        metadata: {
+          projectId,
+          testRunId: testRun.id,
+          correlationId: scheduleId,
+        },
+        baseUrl: '', // will be resolved from project config
+        profileId,
+      });
+      console.info(
+        `[scheduler-worker] Enqueued coordinate job for TestRun ${testRun.id}`,
+      );
+    }
+  } catch {
+    // Coordinate queue not available — the run stays in RUNNING status
+    // and can be picked up by the API polling or completed manually.
+    console.warn(
+      `[scheduler-worker] Could not enqueue coordinate job for TestRun ${testRun.id} — run stays in RUNNING state`,
+    );
+  }
 }
 
 // =============================================================================

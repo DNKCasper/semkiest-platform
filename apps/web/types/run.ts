@@ -63,3 +63,75 @@ export interface RunTrendPoint {
 export interface RunTrendResponse {
   data: RunTrendPoint[];
 }
+
+/** Simplified test profile for run trigger UI */
+export interface TestProfile {
+  id: string;
+  name: string;
+  description?: string;
+  categories: string[];
+  settings: Record<string, unknown>;
+  isDefault?: boolean;
+}
+
+/** Input for triggering a new test run */
+export interface TriggerRunInput {
+  profileId: string;
+}
+
+/** Test result within a run */
+export interface TestResultItem {
+  id: string;
+  testName: string;
+  status: 'passed' | 'failed' | 'skipped' | 'error' | 'running' | 'pending';
+  errorMessage?: string;
+  duration?: number;
+  category?: string;
+  steps?: TestStepItem[];
+}
+
+/** Individual test step */
+export interface TestStepItem {
+  id: string;
+  stepNumber: number;
+  action: string;
+  expected?: string;
+  actual?: string;
+  status: 'passed' | 'failed' | 'skipped' | 'pending';
+  screenshotUrl?: string;
+}
+
+/** Detailed test run with results */
+export interface TestRunDetail extends TestRun {
+  results: TestResultItem[];
+  profile?: {
+    id: string;
+    name: string;
+  };
+}
+
+/** Summary statistics for a test run */
+export interface RunSummary {
+  totalTests: number;
+  passedTests: number;
+  failedTests: number;
+  skippedTests: number;
+  passRate: number;
+  duration: number | null;
+}
+
+/** A live test result update from WebSocket */
+export interface TestResult {
+  id: string;
+  testName: string;
+  status: 'PASSED' | 'FAILED' | 'SKIPPED' | 'ERROR' | 'RUNNING' | 'PENDING';
+  errorMessage?: string;
+  category?: string;
+}
+
+/** Discriminated union of all WebSocket message types */
+export type RunUpdateMessage =
+  | { type: 'run.status'; runId: string; status: RunStatus }
+  | { type: 'run.result'; runId: string; result: TestResult }
+  | { type: 'run.summary'; runId: string; summary: RunSummary }
+  | { type: 'run.complete'; runId: string; run: { status: RunStatus; summary: RunSummary } };
