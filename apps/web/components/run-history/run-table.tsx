@@ -50,7 +50,8 @@ const TRIGGER_LABELS: Record<TestRun['triggerType'], string> = {
   scheduled: 'Scheduled',
 };
 
-function formatDuration(seconds: number): string {
+function formatDuration(seconds: number | null | undefined): string {
+  if (seconds == null || isNaN(seconds)) return '—';
   if (seconds < 60) return `${seconds}s`;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -232,11 +233,13 @@ export function RunTable({
                   <TableCell>
                     <Badge
                       variant={
-                        STATUS_BADGE_VARIANTS[run.status] ?? 'outline'
+                        STATUS_BADGE_VARIANTS[run.status?.toLowerCase() as keyof typeof STATUS_BADGE_VARIANTS] ?? 'outline'
                       }
                     >
-                      {run.status.charAt(0).toUpperCase() +
-                        run.status.slice(1)}
+                      {run.status
+                        ? run.status.charAt(0).toUpperCase() +
+                          run.status.slice(1).toLowerCase()
+                        : '—'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -269,7 +272,7 @@ export function RunTable({
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">
-                      {TRIGGER_LABELS[run.triggerType]}
+                      {TRIGGER_LABELS[run.triggerType] ?? 'Manual'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm max-w-32 truncate">

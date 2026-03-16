@@ -7,8 +7,10 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 /** Format a date string for display. */
-export function formatDate(dateStr: string | Date): string {
+export function formatDate(dateStr: string | Date | null | undefined): string {
+  if (dateStr == null) return '—';
   const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  if (isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -17,8 +19,10 @@ export function formatDate(dateStr: string | Date): string {
 }
 
 /** Format a date+time string for display. */
-export function formatDateTime(dateStr: string | Date): string {
+export function formatDateTime(dateStr: string | Date | null | undefined): string {
+  if (dateStr == null) return '—';
   const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  if (isNaN(date.getTime())) return '—';
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
