@@ -119,7 +119,7 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { projectId } = paramsResult.data;
-      const { profileId, triggerType } = bodyResult.data;
+      const { profileId } = bodyResult.data;
       const { orgId } = request.user;
 
       try {
@@ -150,11 +150,12 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         // Create the test run
+        // Note: triggerType is accepted in the request body for client tracking
+        // but is NOT persisted — the Prisma TestRun model has no triggerType column.
         const testRun = await prisma.testRun.create({
           data: {
             testProfileId: profileId,
             status: 'PENDING',
-            triggerType,
           },
           include: {
             testResults: true,
@@ -210,7 +211,7 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { projectId } = paramsResult.data;
-      const { page, pageSize, status, triggerType, sort, sortDir } = queryResult.data;
+      const { page, pageSize, status, sort, sortDir } = queryResult.data;
       const { orgId } = request.user;
 
       const offset = (page - 1) * pageSize;
@@ -230,12 +231,13 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         // Build where clause
+        // Note: triggerType is accepted in query params but not filterable
+        // since it's not persisted on the TestRun model.
         const where: Record<string, unknown> = {
           testProfile: {
             projectId,
           },
           ...(status !== undefined && { status }),
-          ...(triggerType !== undefined && { triggerType }),
         };
 
         const orderBy = { [SORT_FIELD_MAP[sort]]: sortDir };
