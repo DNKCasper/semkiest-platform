@@ -25,13 +25,17 @@ function formatDuration(ms: number): string {
 }
 
 const STATUS_CONFIG: Record<
-  RunStatus,
+  string,
   { label: string; className: string; variant: 'success' | 'destructive' | 'warning' | 'secondary' | 'default' }
 > = {
   queued: { label: 'Queued', className: 'text-muted-foreground', variant: 'secondary' },
+  pending: { label: 'Pending', className: 'text-muted-foreground', variant: 'secondary' },
+  initializing: { label: 'Initializing', className: 'text-yellow-600', variant: 'warning' },
   running: { label: 'Running', className: 'text-blue-600', variant: 'default' },
   passed: { label: 'Passed', className: 'text-green-600', variant: 'success' },
+  completed: { label: 'Completed', className: 'text-green-600', variant: 'success' },
   failed: { label: 'Failed', className: 'text-red-600', variant: 'destructive' },
+  mixed: { label: 'Mixed', className: 'text-yellow-600', variant: 'warning' },
   cancelled: { label: 'Cancelled', className: 'text-muted-foreground', variant: 'secondary' },
 };
 
@@ -74,7 +78,7 @@ export function SummaryStats({
   completedAt,
   isLive = false,
 }: SummaryStatsProps) {
-  const statusConfig = STATUS_CONFIG[status];
+  const statusConfig = STATUS_CONFIG[status] ?? STATUS_CONFIG.queued;
   const passRate = summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 0;
 
   return (

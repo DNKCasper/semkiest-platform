@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { RunUpdateMessage, TestResult, RunStatus, RunSummary } from '../types/run';
+import type { RunUpdateMessage, LiveTestResult, RunStatus, RunSummary } from '../types/run';
 
 const WS_BASE_URL =
   typeof window !== 'undefined'
@@ -10,7 +10,7 @@ const WS_BASE_URL =
 
 export interface UseRunWebSocketReturn {
   isConnected: boolean;
-  latestResults: TestResult[];
+  latestResults: LiveTestResult[];
   runStatus: RunStatus | null;
   runSummary: RunSummary | null;
 }
@@ -21,7 +21,7 @@ export interface UseRunWebSocketReturn {
  */
 export function useRunWebSocket(runId: string): UseRunWebSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
-  const [latestResults, setLatestResults] = useState<TestResult[]>([]);
+  const [latestResults, setLatestResults] = useState<LiveTestResult[]>([]);
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
   const wsRef = useRef<WebSocket | null>(null);

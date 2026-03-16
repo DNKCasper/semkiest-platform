@@ -4,6 +4,9 @@ import type {
   RunQueryParams,
   RunTrendResponse,
   TriggerRunInput,
+  CategoryResults,
+  TestCategory,
+  RunSummary,
 } from '../types/run';
 import type { ApiError } from '../types/project';
 import { getStoredTokens, isTokenExpired } from './auth-service';
@@ -67,11 +70,96 @@ function buildQueryString(params: RunQueryParams): string {
   return `?${qs}`;
 }
 
+// ---------------------------------------------------------------------------
+// Data transformation helpers
+// ---------------------------------------------------------------------------
+
+/** Map Prisma result status → frontend display status */
+function mapResultStatus(status: string): 'pass' | 'fail' | 'warning' | 'skip' {
+  switch (status?.toUpperCase()) {
+    case 'PASSED': return 'pass';
+    case 'FAILED': return 'fail';
+    case 'WARNING': return 'warning';
+    case 'SKIPPED': return 'skip';
+    default: return 'skip';
+  }
+}
+
+/** Infer a test category from the test name. */
+function inferCategory(testName: string): TestCategory {
+  const lower = testName.toLowerCase();
+  if (lower.includes('visual') || lower.includes('screenshot') || lower.includes('baseline')) return 'visual';
+  if (lower.includes('performance') || lower.includes('speed') || lower.includes('load time')) return 'performance';
+  if (lower.includes('accessibility') || lower.includes('a11y') || lower.includes('wcag')) return 'accessibility';
+  if (lower.includes('security') || lower.includes('auth') || lower.includes('xss')) return 'security';
+  if (lower.includes('api') || lower.includes('endpoint') || lower.includes('contract')) return 'api';
+  return 'ui'; // default category
+}
+
+/** Build category groups from a flat testResults array. */
+function buildCategories(testResults: any[]): CategoryResults[] {
+  if (!testResults || testResults.length === 0) return [];
+
+  const categoryMap = new Map<TestCategory, CategoryResults>();
+
+  for (const tr of testResults) {
+    const cat = inferCategory(tr.testName ?? '');
+
+    if (!categoryMap.has(cat)) {
+      categoryMap.set(cat, {
+        category: cat,
+        stats: { total: 0, passed: 0, failed: 0, warnings: 0, skipped: 0 },
+        results: [],
+      });
+    }
+
+    const group = categoryMap.get(cat)!;
+    const displayStatus = mapResultStatus(tr.status);
+
+    group.results.push({
+      id: tr.id,
+      name: tr.testName ?? 'Unnamed test',
+      description: tr.errorMessage ? `Error: ${tr.errorMessage}` : undefined,
+      status: displayStatus,
+      severity: displayStatus === 'fail' ? 'high' : displayStatus === 'warning' ? 'medium' : 'info',
+      error: tr.errorMessage ?? undefined,
+      category: cat,
+      duration: tr.duration ?? 0,
+    });
+
+    group.stats.total += 1;
+    if (displayStatus === 'pass') group.stats.passed += 1;
+    else if (displayStatus === 'fail') group.stats.failed += 1;
+    else if (displayStatus === 'warning') group.stats.warnings += 1;
+    else if (displayStatus === 'skip') group.stats.skipped += 1;
+  }
+
+  return Array.from(categoryMap.values());
+}
+
+/** Build a RunSummary from raw API data. */
+function buildSummary(raw: any): RunSummary {
+  return {
+    total: raw.totalTests ?? 0,
+    passed: raw.passedTests ?? 0,
+    failed: raw.failedTests ?? 0,
+    warnings: 0,
+    skipped: raw.skippedTests ?? 0,
+    duration: raw.duration ?? 0,
+  };
+}
+
 /**
  * Normalise a raw run object returned by the API so it matches the
- * frontend `TestRun` shape (lowercase status, 0-1 passRate, etc.).
+ * frontend `TestRun` shape (lowercase status, 0-1 passRate, categories, etc.).
  */
 function normalizeRun(raw: any): TestRun {
+  const totalTests = raw.totalTests ?? 0;
+  const passedTests = raw.passedTests ?? 0;
+  const failedTests = raw.failedTests ?? 0;
+  const skippedTests = raw.skippedTests ?? 0;
+  const startedAt = raw.startedAt ?? raw.createdAt ?? new Date().toISOString();
+
   return {
     ...raw,
     // Prisma returns UPPER_CASE status – frontend uses lower case
@@ -82,15 +170,25 @@ function normalizeRun(raw: any): TestRun {
         ? raw.passRate / 100
         : raw.passRate ?? 0,
     // Ensure numeric fields have sane defaults
-    totalTests: raw.totalTests ?? 0,
-    passedTests: raw.passedTests ?? 0,
-    failedTests: raw.failedTests ?? 0,
-    skippedTests: raw.skippedTests ?? 0,
+    totalTests,
+    passedTests,
+    failedTests,
+    skippedTests,
+    completedTests: passedTests + failedTests + skippedTests,
     duration: raw.duration ?? 0,
     // triggerType may be absent from the DB – default to 'manual'
     triggerType: raw.triggerType?.toLowerCase() ?? 'manual',
     // startedAt may be null – fall back to createdAt
-    startedAt: raw.startedAt ?? raw.createdAt ?? new Date().toISOString(),
+    startedAt,
+    // triggeredAt is an alias used by the run-detail page
+    triggeredAt: startedAt,
+    // Computed fields for the run-detail page
+    summary: buildSummary(raw),
+    categories: buildCategories(raw.testResults ?? []),
+    // Profile info
+    profile: raw.testProfile
+      ? { id: raw.testProfile.id, name: raw.testProfile.name }
+      : undefined,
   };
 }
 

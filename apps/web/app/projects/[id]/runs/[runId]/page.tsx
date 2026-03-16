@@ -6,12 +6,11 @@ import {
   ArrowLeft,
   RefreshCw,
   AlertCircle,
-  GitBranch,
   User,
   Calendar,
   Loader2,
 } from 'lucide-react';
-import { runsApi } from '../../../../../lib/api-client';
+import { runsApi } from '../../../../../lib/runs-api-client';
 import { useRunWebSocket } from '../../../../../hooks/use-run-websocket';
 import { SummaryStats } from '../../../../../components/run-detail/summary-stats';
 import { CategorySection } from '../../../../../components/run-detail/category-section';
@@ -35,39 +34,6 @@ const TRIGGER_LABEL: Record<string, string> = {
   ci: 'CI/CD',
 };
 
-/** Merges WebSocket live results into the fetched category data. */
-function mergeLiveResults(
-  categories: CategoryResults[],
-  liveResults: TestRun['categories'][number]['results'],
-): CategoryResults[] {
-  if (liveResults.length === 0) return categories;
-
-  return categories.map((cat) => {
-    const liveForCat = liveResults.filter((r) => r.category === cat.category);
-    if (liveForCat.length === 0) return cat;
-
-    const merged = [...cat.results];
-    for (const liveResult of liveForCat) {
-      const idx = merged.findIndex((r) => r.id === liveResult.id);
-      if (idx >= 0) {
-        merged[idx] = liveResult;
-      } else {
-        merged.push(liveResult);
-      }
-    }
-
-    const stats = {
-      total: merged.length,
-      passed: merged.filter((r) => r.status === 'pass').length,
-      failed: merged.filter((r) => r.status === 'fail').length,
-      warnings: merged.filter((r) => r.status === 'warning').length,
-      skipped: merged.filter((r) => r.status === 'skip').length,
-    };
-
-    return { ...cat, results: merged, stats };
-  });
-}
-
 /** Sorts categories by CATEGORY_ORDER, placing unknown ones at the end. */
 function sortCategories(categories: CategoryResults[]): CategoryResults[] {
   return [...categories].sort((a, b) => {
@@ -86,35 +52,52 @@ export default function RunDetailPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const { isConnected, latestResults, runStatus, runSummary } = useRunWebSocket(runId);
+  const { isConnected, runStatus, runSummary } = useRunWebSocket(runId);
 
-  const fetchRun = React.useCallback(async () => {
-    setIsLoading(true);
+  const fetchRun = React.useCallback(async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
     setError(null);
     try {
       const data = await runsApi.get(projectId, runId);
       setRun(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load test run.');
+      // Only set error on initial load — silently ignore polling errors
+      if (showLoading) {
+        setError(err instanceof Error ? err.message : 'Failed to load test run.');
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   }, [projectId, runId]);
 
   React.useEffect(() => {
-    void fetchRun();
+    void fetchRun(true); // Initial load shows loading state
   }, [fetchRun]);
 
-  // Derive display data: prefer WebSocket live values when available
+  // Polling fallback: refetch every 5s when run is still active and WS is not connected
   const displayStatus = runStatus ?? run?.status ?? 'queued';
+  const isRunActive = ['queued', 'pending', 'initializing', 'running'].includes(displayStatus);
+
+  React.useEffect(() => {
+    if (!isRunActive) return;
+    // If WebSocket is connected, no need to poll
+    if (isConnected) return;
+
+    const interval = setInterval(() => {
+      void fetchRun();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isRunActive, isConnected, fetchRun]);
+
+  // Derive display data: prefer WebSocket live values when available
   const displaySummary = runSummary ?? run?.summary ?? null;
   const isLive = displayStatus === 'running';
 
   const categories = React.useMemo(() => {
     if (!run) return [];
-    const merged = mergeLiveResults(run.categories, latestResults);
-    return sortCategories(merged);
-  }, [run, latestResults]);
+    return sortCategories(run.categories ?? []);
+  }, [run]);
 
   // ─── Loading state ───────────────────────────────────────────────────────────
   if (isLoading) {
@@ -143,7 +126,7 @@ export default function RunDetailPage() {
               <ArrowLeft className="h-4 w-4 mr-1.5" />
               Go back
             </Button>
-            <Button size="sm" onClick={() => void fetchRun()}>
+            <Button size="sm" onClick={() => void fetchRun(false)}>
               <RefreshCw className="h-4 w-4 mr-1.5" />
               Retry
             </Button>
@@ -179,6 +162,22 @@ export default function RunDetailPage() {
               <Badge variant="outline" className="text-xs">
                 {TRIGGER_LABEL[run.triggerType] ?? run.triggerType}
               </Badge>
+              <Badge
+                variant={
+                  displayStatus === 'passed' || displayStatus === 'completed' ? 'default' :
+                  displayStatus === 'failed' ? 'destructive' :
+                  displayStatus === 'running' ? 'default' :
+                  'secondary'
+                }
+                className={`text-xs ${
+                  displayStatus === 'passed' || displayStatus === 'completed' ? 'bg-green-600' :
+                  displayStatus === 'running' ? 'bg-blue-600' :
+                  ''
+                }`}
+              >
+                {isRunActive && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+              </Badge>
             </div>
             <div className="flex items-center gap-4 mt-0.5 text-xs text-muted-foreground flex-wrap">
               {run.triggeredBy && (
@@ -204,7 +203,7 @@ export default function RunDetailPage() {
               )}
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void fetchRun()}>
+          <Button variant="outline" size="sm" onClick={() => void fetchRun(false)}>
             <RefreshCw className="h-4 w-4 mr-1.5" />
             Refresh
           </Button>
@@ -233,11 +232,27 @@ export default function RunDetailPage() {
           </h2>
           {categories.length === 0 ? (
             <div className="rounded-lg border bg-muted/20 p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                {isLive
-                  ? 'Tests are running… results will appear here.'
-                  : 'No test results available for this run.'}
-              </p>
+              {isRunActive ? (
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    {displayStatus === 'queued' || displayStatus === 'pending'
+                      ? 'Test run is queued… waiting for a worker to pick it up.'
+                      : displayStatus === 'initializing'
+                        ? 'Test run is initializing… setting up the test environment.'
+                        : 'Tests are running… results will appear here as they complete.'}
+                  </p>
+                  {!isConnected && (
+                    <p className="text-xs text-muted-foreground">
+                      Polling for updates every 5 seconds.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No test results available for this run.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">

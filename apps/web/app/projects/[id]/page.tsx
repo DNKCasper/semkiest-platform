@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   BarChart3,
   FlaskConical,
@@ -12,6 +12,8 @@ import {
   Globe,
   Settings2,
   Play,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { projectsApi } from '../../../lib/api-client';
 import { profilesApi } from '../../../lib/profiles-api-client';
@@ -32,11 +34,13 @@ import { RunTrigger } from '../../../components/run/run-trigger';
 
 export default function ProjectOverviewPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<TestProfile[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(true);
+  const [triggeredRun, setTriggeredRun] = useState<{ id: string } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -74,7 +78,10 @@ export default function ProjectOverviewPage() {
   }, [project]);
 
   async function handleTriggerRun(input: TriggerRunInput) {
-    await runsApi.trigger(project!.id, input);
+    const run = await runsApi.trigger(project!.id, input);
+    setTriggeredRun({ id: run.id });
+    // Navigate to the run detail page so the user can monitor progress
+    router.push(`/projects/${project!.id}/runs/${run.id}`);
   }
 
   if (loading) {
@@ -163,6 +170,31 @@ export default function ProjectOverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Run triggered success banner */}
+      {triggeredRun && (
+        <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
+          <Loader2 className="h-5 w-5 animate-spin text-green-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-green-800">
+              Test run started successfully!
+            </p>
+            <p className="text-xs text-green-600 mt-0.5">
+              Navigating to run details…
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="border-green-300 text-green-700 hover:bg-green-100"
+          >
+            <Link href={`/projects/${project.id}/runs/${triggeredRun.id}`}>
+              View Run <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Run Test */}
       <Card>
