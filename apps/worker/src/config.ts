@@ -50,10 +50,13 @@ export const config = {
    * they consume significantly more memory per concurrent job.
    */
   concurrencyByType: {
+    coordinate: Math.max(1, Math.floor(env.WORKER_CONCURRENCY / 2)),
     explore: Math.max(1, Math.floor(env.WORKER_CONCURRENCY / 2)),
     'spec-read': Math.max(1, Math.floor(env.WORKER_CONCURRENCY / 2)),
     'ui-test': Math.max(1, Math.floor(env.WORKER_CONCURRENCY / 4)),
     'visual-test': Math.max(1, Math.floor(env.WORKER_CONCURRENCY / 4)),
+    performance: Math.max(1, Math.floor(env.WORKER_CONCURRENCY / 4)),
+    'api-test': Math.max(1, Math.floor(env.WORKER_CONCURRENCY / 2)),
   } satisfies Record<AgentJobType, number>,
 };
 

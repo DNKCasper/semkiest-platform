@@ -4,9 +4,11 @@ import { config } from './config';
 import {
   AGENT_QUEUES,
   DEAD_LETTER_QUEUE,
+  COORDINATE_QUEUE,
   buildJobOptions,
   JobPriority,
   type AgentQueueName,
+  type CoordinateJobPayload,
   type ExploreJobPayload,
   type SpecReadJobPayload,
   type UiTestJobPayload,
@@ -61,6 +63,7 @@ function makeQueue<T>(name: string, retryConfig: RetryConfig = DEFAULT_RETRY_CON
 // Agent queues
 // ---------------------------------------------------------------------------
 
+export const coordinateQueue = makeQueue<CoordinateJobPayload>(COORDINATE_QUEUE);
 export const exploreQueue = makeQueue<ExploreJobPayload>('explore');
 export const specReadQueue = makeQueue<SpecReadJobPayload>('spec-read');
 export const uiTestQueue = makeQueue<UiTestJobPayload>('ui-test');
@@ -71,11 +74,12 @@ export const visualTestQueue = makeQueue<VisualTestJobPayload>('visual-test');
  * Use `getQueue(name)` for safe access with a type-narrowed return.
  */
 export const queueRegistry = {
+  coordinate: coordinateQueue,
   explore: exploreQueue,
   'spec-read': specReadQueue,
   'ui-test': uiTestQueue,
   'visual-test': visualTestQueue,
-} satisfies Record<AgentQueueName, Queue>;
+} as Record<string, Queue>;
 
 // ---------------------------------------------------------------------------
 // Dead letter queue
@@ -97,6 +101,24 @@ export const deadLetterQueue = new Queue(DEAD_LETTER_QUEUE, {
 // ---------------------------------------------------------------------------
 // Enqueue helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Enqueue a coordinate job (orchestrates a full multi-agent test run).
+ *
+ * @param payload - Job data including metadata, baseUrl, and profileId
+ * @param retryConfig - Optional override for retry/backoff policy
+ */
+export async function enqueueCoordinateJob(
+  payload: CoordinateJobPayload,
+  retryConfig?: RetryConfig,
+): Promise<string> {
+  const job = await coordinateQueue.add(
+    'coordinate',
+    payload,
+    buildJobOptions(payload.priority, retryConfig),
+  );
+  return job.id ?? '';
+}
 
 /**
  * Enqueue an explore job.
@@ -173,7 +195,7 @@ export async function publishProgress(update: JobProgressUpdate): Promise<void> 
  */
 export async function closeQueues(): Promise<void> {
   await Promise.all([
-    ...AGENT_QUEUES.map((name) => queueRegistry[name].close()),
+    ...AGENT_QUEUES.map((name) => queueRegistry[name]?.close()).filter(Boolean),
     deadLetterQueue.close(),
     redisConnection.quit(),
     redisPubSub.quit(),

@@ -8,7 +8,8 @@
       "@semkiest/shared-types": ["../../packages/shared-types/src"],
       "@semkiest/shared-utils": ["../../packages/shared-utils/src"],
       "@semkiest/shared-config": ["../../packages/shared-config/src"],
-      "@semkiest/db": ["../../packages/db/src"]
+      "@semkiest/db": ["../../packages/db/src"],
+      "@semkiest/coordinator": ["../../packages/agents/coordinator/src"]
     }
   },
   "include": ["src/**/*.ts"],

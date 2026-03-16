@@ -46,6 +46,16 @@ const schedulerWorker = createSchedulerWorker(
 
 console.log('[worker] Registered scheduler queue processor');
 
+// Register the coordinate queue processor.
+// This handles multi-agent test run orchestration via the CoordinatorAgent.
+import { createCoordinateWorker } from './workers/coordinate.worker';
+const coordinateWorker = createCoordinateWorker(
+  { host: redisHost, port: redisPort },
+  Math.max(1, Math.floor((Number(env.WORKER_CONCURRENCY) || 5) / 2)),
+);
+
+console.log('[worker] Registered coordinate queue processor');
+
 // ── Graceful shutdown ────────────────────────────────────────────────────────
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -53,6 +63,7 @@ async function shutdown(signal: string): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`[worker] Received ${signal}, shutting down…`);
   if (heartbeatTimer) clearInterval(heartbeatTimer);
+  await coordinateWorker.close();
   await schedulerWorker.close();
   await pool.closeAll();
   await flushSentry();

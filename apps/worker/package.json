@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@semkiest/coordinator": "workspace:*",
     "@semkiest/db": "workspace:*",
     "@semkiest/shared-config": "workspace:*",
     "@semkiest/shared-types": "workspace:*",

@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 
 import { authenticate } from '../middleware/org-isolation';
 import { broadcastToRun } from './ws-runs';
+import { enqueueCoordinateJob } from '../queues/coordinate.queue';
 import {
   ProjectIdParamsSchema,
   RunIdParamsSchema,
@@ -166,6 +167,34 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
             testResults: true,
           },
         });
+
+        // Enqueue a coordinate job so the worker picks up and executes the test run.
+        // This is fire-and-forget from the API's perspective — the worker will
+        // update the TestRun status to RUNNING → PASSED/FAILED as it progresses.
+        try {
+          const jobId = await enqueueCoordinateJob({
+            metadata: {
+              projectId,
+              testRunId: testRun.id,
+              correlationId: testRun.id,
+            },
+            baseUrl: project.url ?? '',
+            profileId,
+          });
+
+          fastify.log.info(
+            { testRunId: testRun.id, jobId },
+            'Enqueued coordinate job for test run',
+          );
+        } catch (enqueueErr) {
+          // If the queue is unavailable, the run stays in PENDING. The frontend
+          // will show it as pending and the user can retry. We don't fail the
+          // HTTP request because the TestRun was successfully created.
+          fastify.log.warn(
+            { testRunId: testRun.id, error: enqueueErr },
+            'Failed to enqueue coordinate job — run will stay in PENDING',
+          );
+        }
 
         // Enhance with computed stats
         const enhancedRun = enhanceRunWithStats(testRun);
