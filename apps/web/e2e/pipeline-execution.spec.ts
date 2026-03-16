@@ -128,7 +128,7 @@ async function pollRunUntilComplete(
 // ---------------------------------------------------------------------------
 
 async function loginViaUI(page: Page): Promise<void> {
-  await page.goto('/auth/login');
+  await page.goto(`${WEB_URL}/auth/login`);
   await page.waitForLoadState('networkidle');
   await page.fill('input[name="email"]', PLATFORM_EMAIL);
   await page.fill('input[name="password"]', PLATFORM_PASSWORD);
@@ -407,7 +407,7 @@ test.describe('Pipeline Execution — UI Verification', () => {
 
     await loginViaUI(page);
 
-    await page.goto(`/projects/${projectId}/runs`);
+    await page.goto(`${WEB_URL}/projects/${projectId}/runs`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
@@ -436,7 +436,7 @@ test.describe('Pipeline Execution — UI Verification', () => {
 
     await loginViaUI(page);
 
-    await page.goto(`/projects/${projectId}/runs/${testRunId}`);
+    await page.goto(`${WEB_URL}/projects/${projectId}/runs/${testRunId}`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
@@ -472,7 +472,7 @@ test.describe('Pipeline Execution — UI Verification', () => {
 
     await loginViaUI(page);
 
-    await page.goto(`/projects/${projectId}`);
+    await page.goto(`${WEB_URL}/projects/${projectId}`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
