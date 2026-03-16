@@ -1,12 +1,31 @@
 import { PrismaClient } from '@prisma/client';
 
 // Re-export Prisma types for use across packages
-export { Prisma, ProjectStatus, UserRole } from '@prisma/client';
+export {
+  Prisma,
+  UserRole,
+  TestRunStatus,
+  TestResultStatus,
+  TestStepStatus,
+  ScheduleStatus,
+  RunStatus,
+} from '@prisma/client';
+
 export type {
   Organization,
   User,
   Project,
   TestProfile,
+  TestRun,
+  TestResult,
+  TestStep,
+  Screenshot,
+  Baseline,
+  AgentConfig,
+  AiCreditUsage,
+  Notification,
+  Schedule,
+  ScheduleRun,
 } from '@prisma/client';
 
 /**

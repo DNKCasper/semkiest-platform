@@ -1,87 +1,289 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// =============================================================================
+// SemkiEst Platform – Prisma Database Schema (packages/database mirror)
+// This MUST stay in sync with packages/db/prisma/schema.prisma.
+// =============================================================================
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
 
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+// =============================================================================
+// Core Domain Models
+// =============================================================================
 
 enum UserRole {
-  VIEWER
-  MEMBER
-  MANAGER
   ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
 }
 
-enum ProjectStatus {
-  ACTIVE
-  ARCHIVED
+enum TestRunStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  CANCELLED
+  TIMEOUT
 }
 
-/// Represents a tenant organization within the platform
+enum TestResultStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  SKIPPED
+  ERROR
+}
+
+enum TestStepStatus {
+  PENDING
+  PASSED
+  FAILED
+  SKIPPED
+}
+
 model Organization {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  users    User[]
-  projects Project[]
+  users         User[]
+  projects      Project[]
+  agentConfigs  AgentConfig[]
+  aiCreditUsage AiCreditUsage[]
 
   @@map("organizations")
 }
 
-/// Platform user associated with an organization
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  name         String?
-  passwordHash String       @map("password_hash")
-  role         UserRole     @default(MEMBER)
-  orgId        String       @map("org_id")
-  organization Organization @relation(fields: [orgId], references: [id])
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  bio               String?
+  orgId             String   @map("org_id")
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role              UserRole @default(VIEWER)
+  passwordHash      String   @map("password_hash")
+  previousPasswords String[] @default([]) @map("previous_passwords")
+  emailVerified     Boolean  @default(false) @map("email_verified")
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
+  notifications Notification[]
+
+  @@index([orgId])
   @@map("users")
 }
 
-/// A project groups related test profiles and belongs to one organization
 model Project {
-  id           String        @id @default(cuid())
-  name         String
-  description  String?
-  /// Target URL for the project under test.
-  url          String?
-  status       ProjectStatus @default(ACTIVE)
-  orgId        String        @map("org_id")
-  organization Organization  @relation(fields: [orgId], references: [id])
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  deletedAt    DateTime?     @map("deleted_at")
+  id          String   @id @default(cuid())
+  orgId       String   @map("org_id")
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  url         String?
+  status      String   @default("ACTIVE")
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  profiles TestProfile[]
+  testProfiles TestProfile[]
+  baselines    Baseline[]
 
   @@index([orgId])
-  @@index([status])
   @@map("projects")
 }
 
-/// A test profile defines configuration for a set of test runs within a project
 model TestProfile {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name      String
-  config    Json      @default("{}")
-  projectId String    @map("project_id")
-  project   Project   @relation(fields: [projectId], references: [id])
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  config    Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  testRuns TestRun[]
 
   @@index([projectId])
   @@map("test_profiles")
+}
+
+model TestRun {
+  id            String        @id @default(cuid())
+  testProfileId String        @map("test_profile_id")
+  testProfile   TestProfile   @relation(fields: [testProfileId], references: [id], onDelete: Cascade)
+  status        TestRunStatus @default(PENDING)
+  startedAt     DateTime?     @map("started_at")
+  completedAt   DateTime?     @map("completed_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  testResults TestResult[]
+
+  @@index([testProfileId])
+  @@index([status])
+  @@map("test_runs")
+}
+
+model TestResult {
+  id           String           @id @default(cuid())
+  testRunId    String           @map("test_run_id")
+  testRun      TestRun          @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  testName     String           @map("test_name")
+  status       TestResultStatus @default(PENDING)
+  errorMessage String?          @map("error_message")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  testSteps TestStep[]
+
+  @@index([testRunId])
+  @@index([status])
+  @@map("test_results")
+}
+
+model TestStep {
+  id           String       @id @default(cuid())
+  testResultId String       @map("test_result_id")
+  testResult   TestResult   @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  stepNumber   Int          @map("step_number")
+  action       String
+  expected     String?
+  actual       String?
+  status       TestStepStatus @default(PENDING)
+
+  screenshots Screenshot[]
+
+  @@index([testResultId])
+  @@map("test_steps")
+}
+
+model Screenshot {
+  id         String   @id @default(cuid())
+  testStepId String   @map("test_step_id")
+  testStep   TestStep @relation(fields: [testStepId], references: [id], onDelete: Cascade)
+  s3Key      String   @map("s3_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([testStepId])
+  @@map("screenshots")
+}
+
+model Baseline {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  s3Key     String   @map("s3_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@map("baselines")
+}
+
+model AgentConfig {
+  id         String       @id @default(cuid())
+  orgId      String       @map("org_id")
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  configJson Json         @default("{}") @map("config_json")
+  active     Boolean      @default(true)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  @@index([orgId])
+  @@map("agent_configs")
+}
+
+model AiCreditUsage {
+  id          String       @id @default(cuid())
+  orgId       String       @map("org_id")
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  creditsUsed Int          @map("credits_used")
+  reason      String
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([orgId])
+  @@map("ai_credit_usage")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
+}
+
+// =============================================================================
+// Schedule Models
+// =============================================================================
+
+enum ScheduleStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model Schedule {
+  id             String         @id @default(cuid())
+  name           String
+  description    String?
+  cronExpression String
+  timezone       String         @default("UTC")
+  projectId      String
+  status         ScheduleStatus @default(ACTIVE)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  lastRunStatus  RunStatus?
+  missedRuns     Int            @default(0)
+  retryAttempts  Int            @default(3)
+  retryDelay     Int            @default(5000)
+  notifications  Boolean        @default(false)
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  runs ScheduleRun[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([nextRunAt])
+}
+
+model ScheduleRun {
+  id           String    @id @default(cuid())
+  scheduleId   String
+  schedule     Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  status       RunStatus
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  errorMessage String?
+  jobId        String?
+  attempt      Int       @default(1)
+  createdAt    DateTime  @default(now())
+
+  @@index([scheduleId])
+  @@index([status])
+  @@index([startedAt])
 }

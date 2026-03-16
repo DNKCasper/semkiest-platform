@@ -19,9 +19,12 @@ COPY . .
 RUN pnpm install --no-frozen-lockfile
 
 # Generate Prisma clients (dummy URL - generate only reads schema, no DB connection)
+# IMPORTANT: packages/db generates LAST because both packages share the same
+# @prisma/client output — whichever runs last wins.  packages/db is the
+# canonical schema with all fields (auth columns, url, status, etc.).
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-RUN cd packages/db && npx prisma generate && cd /app && \
-    cd packages/database && npx prisma generate && cd /app && \
+RUN cd packages/database && npx prisma generate && cd /app && \
+    cd packages/db && npx prisma generate && cd /app && \
     pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-types build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
