@@ -3,6 +3,7 @@ import { prisma } from '@semkiest/db';
 import { RunStatus } from '@semkiest/db';
 import type { ScheduledTestJobData, ScheduledTestJobResult } from '@semkiest/shared-types';
 import { SCHEDULER_QUEUE_NAME } from '../queues/scheduler.queue';
+import { config } from '../config';
 
 // =============================================================================
 // Scheduled-test job processor
@@ -232,6 +233,7 @@ export function createSchedulerWorker(
     {
       connection,
       concurrency,
+      prefix: config.redis.keyPrefix,
       // Lock duration: 30 s per job; auto-extended while the job is processing
       lockDuration: 30_000,
     },

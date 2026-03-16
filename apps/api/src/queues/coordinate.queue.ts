@@ -72,6 +72,7 @@ async function getBullMQQueue(): Promise<any | null> {
     const Queue = bullmq.Queue;
     _bullmqQueue = new Queue(COORDINATE_QUEUE, {
       connection: getRedis(),
+      prefix: REDIS_PREFIX,
       defaultJobOptions: {
         attempts: 2,
         backoff: { type: 'exponential', delay: 5_000 },

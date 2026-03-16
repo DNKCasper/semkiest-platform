@@ -15,6 +15,7 @@
 
 import { Worker, type Job, type ConnectionOptions } from 'bullmq';
 import { prisma } from '@semkiest/db';
+import { config } from '../config';
 import {
   PlanBuilder,
   CoordinatorAgent,
@@ -320,6 +321,7 @@ export function createCoordinateWorker(
     {
       connection,
       concurrency,
+      prefix: config.redis.keyPrefix,
       lockDuration: 600_000, // 10 minutes — coordinate jobs are long-running
     },
   );
