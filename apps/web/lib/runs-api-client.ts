@@ -67,38 +67,85 @@ function buildQueryString(params: RunQueryParams): string {
   return `?${qs}`;
 }
 
+/**
+ * Normalise a raw run object returned by the API so it matches the
+ * frontend `TestRun` shape (lowercase status, 0-1 passRate, etc.).
+ */
+function normalizeRun(raw: any): TestRun {
+  return {
+    ...raw,
+    // Prisma returns UPPER_CASE status – frontend uses lower case
+    status: typeof raw.status === 'string' ? raw.status.toLowerCase() : raw.status,
+    // API returns passRate as 0-100 integer; frontend expects 0-1 ratio
+    passRate:
+      raw.passRate != null && raw.passRate > 1
+        ? raw.passRate / 100
+        : raw.passRate ?? 0,
+    // Ensure numeric fields have sane defaults
+    totalTests: raw.totalTests ?? 0,
+    passedTests: raw.passedTests ?? 0,
+    failedTests: raw.failedTests ?? 0,
+    skippedTests: raw.skippedTests ?? 0,
+    duration: raw.duration ?? 0,
+    // triggerType may be absent from the DB – default to 'manual'
+    triggerType: raw.triggerType?.toLowerCase() ?? 'manual',
+    // startedAt may be null – fall back to createdAt
+    startedAt: raw.startedAt ?? raw.createdAt ?? new Date().toISOString(),
+  };
+}
+
 /** Test run API methods */
 export const runsApi = {
   /** GET /api/projects/:projectId/runs */
-  list(
+  async list(
     projectId: string,
     params: RunQueryParams = {},
   ): Promise<RunListResponse> {
-    return request<RunListResponse>(
+    // The API returns { data: [...], pagination: { total, page, pageSize, hasMore } }
+    // but RunListResponse expects { data, total, page, pageSize } flat.
+    const raw = await request<any>(
       `/api/projects/${projectId}/runs${buildQueryString(params)}`,
     );
+    return {
+      data: (raw.data ?? []).map(normalizeRun),
+      total: raw.pagination?.total ?? raw.total ?? 0,
+      page: raw.pagination?.page ?? raw.page ?? 1,
+      pageSize: raw.pagination?.pageSize ?? raw.pageSize ?? 20,
+    };
   },
 
   /** GET /api/projects/:projectId/runs/:runId */
-  get(projectId: string, runId: string): Promise<TestRun> {
-    return request<TestRun>(`/api/projects/${projectId}/runs/${runId}`);
+  async get(projectId: string, runId: string): Promise<TestRun> {
+    const raw = await request<any>(`/api/projects/${projectId}/runs/${runId}`);
+    // Single-run responses are wrapped in { data: {...} }
+    return normalizeRun(raw.data ?? raw);
   },
 
   /**
    * GET /api/projects/:projectId/runs/trend
    * Returns the last 10 runs' pass-rate data points for trend visualization.
    */
-  trend(projectId: string): Promise<RunTrendResponse> {
-    return request<RunTrendResponse>(
+  async trend(projectId: string): Promise<RunTrendResponse> {
+    const raw = await request<any>(
       `/api/projects/${projectId}/runs/trend`,
     );
+    // Normalise passRate from 0-100 → 0-1
+    const data = (raw.data ?? []).map((point: any) => ({
+      ...point,
+      passRate:
+        point.passRate != null && point.passRate > 1
+          ? point.passRate / 100
+          : point.passRate ?? 0,
+    }));
+    return { data };
   },
 
   /** POST /api/projects/:projectId/runs — trigger a new test run */
-  trigger(projectId: string, input: TriggerRunInput): Promise<TestRun> {
-    return request<TestRun>(`/api/projects/${projectId}/runs`, {
+  async trigger(projectId: string, input: TriggerRunInput): Promise<TestRun> {
+    const raw = await request<any>(`/api/projects/${projectId}/runs`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
+    return normalizeRun(raw.data ?? raw);
   },
 };

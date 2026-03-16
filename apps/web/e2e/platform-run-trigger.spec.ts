@@ -386,13 +386,14 @@ test.describe('Platform Run Trigger — UI Verification', () => {
     });
 
     // The page should show at least one run (the one we triggered)
-    // Look for FAILED status badge or any run data
+    // Look for status badge text (may be Title Case after normalization) or any run data
     const pageContent = await page.textContent('body');
+    const lowerContent = pageContent?.toLowerCase() ?? '';
     const hasRunData =
-      pageContent?.includes('FAILED') ||
-      pageContent?.includes('PASSED') ||
-      pageContent?.includes('RUNNING') ||
-      pageContent?.includes('PENDING');
+      lowerContent.includes('failed') ||
+      lowerContent.includes('passed') ||
+      lowerContent.includes('running') ||
+      lowerContent.includes('pending');
 
     expect(hasRunData).toBe(true);
   });

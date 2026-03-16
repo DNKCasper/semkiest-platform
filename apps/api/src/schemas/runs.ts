@@ -19,7 +19,7 @@ export const ListRunsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   status: z.enum(['PENDING', 'RUNNING', 'PASSED', 'FAILED', 'CANCELLED', 'TIMEOUT']).optional(),
   triggerType: z.enum(['manual', 'ci', 'scheduled']).optional(),
-  sort: z.enum(['startedAt', 'createdAt', 'completedAt']).default('startedAt'),
+  sort: z.enum(['startedAt', 'createdAt', 'completedAt', 'passRate', 'duration', 'totalTests']).default('startedAt'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 

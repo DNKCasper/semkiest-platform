@@ -18,6 +18,11 @@ const SORT_FIELD_MAP: Record<string, string> = {
   startedAt: 'startedAt',
   createdAt: 'createdAt',
   completedAt: 'completedAt',
+  // Frontend also uses these sort keys — fall back to createdAt for fields
+  // that aren't direct Prisma columns (they're computed from testResults).
+  passRate: 'createdAt',
+  duration: 'createdAt',
+  totalTests: 'createdAt',
 };
 
 function formatZodError(err: ZodError): Record<string, string[]> {
@@ -520,6 +525,10 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Update the run
         const updateData: any = { status };
+        // Automatically set startedAt when transitioning to RUNNING
+        if (status === 'RUNNING' && !existingRun.startedAt) {
+          updateData.startedAt = new Date();
+        }
         if (completedAt) {
           updateData.completedAt = new Date(completedAt);
         }
