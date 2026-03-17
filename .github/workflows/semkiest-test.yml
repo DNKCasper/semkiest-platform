@@ -128,7 +128,7 @@ jobs:
 
     steps:
       - name: Checkout SemkiEst action
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Check out the SemkiEst platform repo to access the composite action.
           # When publishing to GitHub Marketplace this step is not needed — the
