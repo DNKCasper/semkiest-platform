@@ -42,28 +42,45 @@ jobs:
           echo "Using image tag: ${SHA::8}"
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Run database migrations before deploying new application code
+  # Run database migrations before deploying new application code.
+  # In staging the API entrypoint also runs ensure-schema.sql + prisma
+  # migrate deploy as a safety net, so a failure here is non-blocking.
   # ─────────────────────────────────────────────────────────────────────────
   migrate:
     name: Run Database Migrations
     runs-on: ubuntu-latest
     needs: check-build
+    # Don't block deploy if migration secrets aren't configured yet
+    continue-on-error: true
 
     permissions:
       id-token: write
       contents: read
 
     steps:
+      - name: Check migration secrets are available
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.ECS_MIGRATION_SUBNET_STAGING }}" ] || [ -z "${{ secrets.ECS_MIGRATION_SG_STAGING }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::warning::Migration secrets not configured — skipping ECS migration task. The API entrypoint will apply migrations on startup."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repository
+        if: steps.check-secrets.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
+        if: steps.check-secrets.outputs.skip != 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run database migrations via ECS one-off task
+        if: steps.check-secrets.outputs.skip != 'true'
         run: |
           chmod +x scripts/migrate.sh
           ./scripts/migrate.sh
@@ -83,6 +100,9 @@ jobs:
     needs:
       - check-build
       - migrate
+    # Proceed with deploy even if migration was skipped or failed —
+    # the API entrypoint runs ensure-schema.sql as a safety net.
+    if: always() && needs.check-build.result == 'success'
 
     permissions:
       id-token: write
@@ -170,13 +190,19 @@ jobs:
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
-    needs: deploy
+    needs:
+      - migrate
+      - deploy
     if: always()
 
     steps:
       - name: Deployment succeeded
         if: needs.deploy.result == 'success'
-        run: echo "Staging deployment succeeded"
+        run: |
+          echo "Staging deployment succeeded"
+          if [ "${{ needs.migrate.result }}" != "success" ]; then
+            echo "::warning::Database migration step was skipped or failed — API entrypoint will apply migrations on startup"
+          fi
 
       - name: Deployment failed
         if: needs.deploy.result != 'success'
