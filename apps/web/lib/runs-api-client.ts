@@ -85,15 +85,44 @@ function mapResultStatus(status: string): 'pass' | 'fail' | 'warning' | 'skip' {
   }
 }
 
-/** Infer a test category from the test name. */
+/**
+ * Parse a testName that may contain a "[category]" prefix.
+ * e.g. "[ui] Homepage load verification" → { category: "ui", name: "Homepage load verification" }
+ */
+function parseTestName(testName: string): { category: TestCategory | null; name: string } {
+  const match = testName.match(/^\[(\w+)\]\s*(.+)$/);
+  if (match) {
+    const cat = match[1] as TestCategory;
+    const validCategories: TestCategory[] = ['ui', 'visual', 'performance', 'accessibility', 'security', 'api'];
+    if (validCategories.includes(cat)) {
+      return { category: cat, name: match[2] };
+    }
+  }
+  return { category: null, name: testName };
+}
+
+/** Infer a test category from the test name (fallback when no [category] prefix). */
 function inferCategory(testName: string): TestCategory {
   const lower = testName.toLowerCase();
   if (lower.includes('visual') || lower.includes('screenshot') || lower.includes('baseline')) return 'visual';
-  if (lower.includes('performance') || lower.includes('speed') || lower.includes('load time')) return 'performance';
-  if (lower.includes('accessibility') || lower.includes('a11y') || lower.includes('wcag')) return 'accessibility';
-  if (lower.includes('security') || lower.includes('auth') || lower.includes('xss')) return 'security';
+  if (lower.includes('performance') || lower.includes('speed') || lower.includes('load time') || lower.includes('web vitals')) return 'performance';
+  if (lower.includes('accessibility') || lower.includes('a11y') || lower.includes('wcag') || lower.includes('keyboard') || lower.includes('aria')) return 'accessibility';
+  if (lower.includes('security') || lower.includes('header') || lower.includes('tls') || lower.includes('ssl')) return 'security';
   if (lower.includes('api') || lower.includes('endpoint') || lower.includes('contract')) return 'api';
   return 'ui'; // default category
+}
+
+/**
+ * Extract duration from test steps metadata.
+ * The worker stores a metadata step with expected="duration_ms=NNN".
+ */
+function extractDuration(testSteps: any[] | undefined): number {
+  if (!testSteps || testSteps.length === 0) return 0;
+  for (const step of testSteps) {
+    const match = (step.expected as string)?.match(/^duration_ms=(\d+)$/);
+    if (match) return parseInt(match[1], 10);
+  }
+  return 0;
 }
 
 /** Build category groups from a flat testResults array. */
@@ -103,8 +132,10 @@ function buildCategories(testResults: any[]): CategoryResults[] {
   const categoryMap = new Map<TestCategory, CategoryResults>();
 
   for (const tr of testResults) {
-    // Prefer explicit category from DB, fall back to name-based inference
-    const cat: TestCategory = (tr.category as TestCategory) || inferCategory(tr.testName ?? '');
+    const rawName: string = tr.testName ?? 'Unnamed test';
+    const parsed = parseTestName(rawName);
+    const cat: TestCategory = parsed.category ?? inferCategory(rawName);
+    const displayName = parsed.name;
 
     if (!categoryMap.has(cat)) {
       categoryMap.set(cat, {
@@ -117,24 +148,28 @@ function buildCategories(testResults: any[]): CategoryResults[] {
     const group = categoryMap.get(cat)!;
     const displayStatus = mapResultStatus(tr.status);
 
-    // Build a human-readable description from test steps when available
+    // Build a human-readable description from test steps (skip metadata step)
     const steps = tr.testSteps as any[] | undefined;
+    const actionSteps = steps?.filter((s: any) => s.action !== 'Test metadata') ?? [];
     let description: string | undefined;
     if (tr.errorMessage) {
       description = `Error: ${tr.errorMessage}`;
-    } else if (steps && steps.length > 0) {
-      description = steps.map((s: any) => s.action).join(' → ');
+    } else if (actionSteps.length > 0) {
+      description = actionSteps.map((s: any) => s.action).join(' → ');
     }
+
+    // Extract duration from metadata step or DB field
+    const duration = tr.duration ?? extractDuration(steps) ?? 0;
 
     group.results.push({
       id: tr.id,
-      name: tr.testName ?? 'Unnamed test',
+      name: displayName,
       description,
       status: displayStatus,
       severity: displayStatus === 'fail' ? 'high' : displayStatus === 'warning' ? 'medium' : 'info',
       error: tr.errorMessage ?? undefined,
       category: cat,
-      duration: tr.duration ?? 0,
+      duration,
     });
 
     group.stats.total += 1;
@@ -158,8 +193,10 @@ function buildSummary(raw: any): RunSummary {
     // Convert seconds → milliseconds
     totalDuration = totalDuration * 1000;
   } else if (testResults && testResults.length > 0) {
-    // Sum individual test durations (already in ms)
-    totalDuration = testResults.reduce((sum: number, tr: any) => sum + (tr.duration ?? 0), 0);
+    // Sum individual test durations (from DB column or metadata step)
+    totalDuration = testResults.reduce((sum: number, tr: any) => {
+      return sum + (tr.duration ?? extractDuration(tr.testSteps) ?? 0);
+    }, 0);
   }
 
   return {

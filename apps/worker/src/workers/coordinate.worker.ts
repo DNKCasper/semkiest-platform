@@ -283,6 +283,8 @@ async function persistResults(testRunId: string, result: CoordinatorResult): Pro
 
     if (subTests && subTests.length > 0) {
       // ── Rich results: one TestResult per sub-test ───────────────────────────
+      // Category is encoded in testName as "[category] Test Name" so the
+      // frontend can parse it without needing extra DB columns.
       for (const subTest of subTests) {
         const subStatus = subTest.status === 'pass' ? 'PASSED'
           : subTest.status === 'fail' ? 'FAILED'
@@ -292,21 +294,31 @@ async function persistResults(testRunId: string, result: CoordinatorResult): Pro
         const testResult = await prisma.testResult.create({
           data: {
             testRunId,
-            testName: subTest.name,
+            testName: `[${subTest.category}] ${subTest.name}`,
             status: subStatus as any,
-            category: subTest.category,
-            duration: subTest.durationMs,
             errorMessage: subTest.error ?? null,
           },
         });
 
-        // Create a TestStep for each step in the sub-test
+        // First step records the duration as metadata
+        await prisma.testStep.create({
+          data: {
+            testResultId: testResult.id,
+            stepNumber: 1,
+            action: 'Test metadata',
+            expected: `duration_ms=${subTest.durationMs}`,
+            actual: `${subStatus.toLowerCase()} in ${subTest.durationMs}ms`,
+            status: 'PASSED',
+          },
+        });
+
+        // Subsequent steps record the actual test actions
         for (let i = 0; i < subTest.steps.length; i++) {
           const step = subTest.steps[i];
           await prisma.testStep.create({
             data: {
               testResultId: testResult.id,
-              stepNumber: i + 1,
+              stepNumber: i + 2,
               action: step.action,
               expected: step.expected,
               actual: step.actual,
@@ -319,18 +331,18 @@ async function persistResults(testRunId: string, result: CoordinatorResult): Pro
       }
     } else {
       // ── Fallback: one TestResult per agent (legacy/simple results) ─────────
+      const agentCategory = agentRun.agentType === 'visual-regression' ? 'visual'
+        : agentRun.agentType === 'accessibility' ? 'accessibility'
+        : agentRun.agentType === 'performance' || agentRun.agentType === 'load' ? 'performance'
+        : agentRun.agentType === 'security' ? 'security'
+        : agentRun.agentType === 'api' ? 'api'
+        : 'ui';
+
       const testResult = await prisma.testResult.create({
         data: {
           testRunId,
-          testName: `${agentRun.agentType} agent`,
+          testName: `[${agentCategory}] ${agentRun.agentType} agent`,
           status: agentStatus as any,
-          category: agentRun.agentType === 'visual-regression' ? 'visual'
-            : agentRun.agentType === 'accessibility' ? 'accessibility'
-            : agentRun.agentType === 'performance' || agentRun.agentType === 'load' ? 'performance'
-            : agentRun.agentType === 'security' ? 'security'
-            : agentRun.agentType === 'api' ? 'api'
-            : 'ui',
-          duration: agentRun.result?.durationMs ?? 0,
           errorMessage: agentRun.error?.message ?? null,
         },
       });
