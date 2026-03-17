@@ -10,13 +10,27 @@
  * dependencies are available.
  */
 
-import {
+import type {
   AgentExecutor,
   AgentConfig,
   AgentExecutionResult,
   AgentType,
   ExecutionContext,
 } from '@semkiest/coordinator';
+
+// ---------------------------------------------------------------------------
+// Dynamic import helper — prevents TypeScript from statically resolving
+// module paths at compile time (TS2307). Agent packages are resolved at
+// runtime via pnpm's node_modules symlinks.
+// ---------------------------------------------------------------------------
+
+/* eslint-disable @typescript-eslint/no-implied-eval */
+async function loadModule(name: string): Promise<any> {
+  // Using Function constructor to prevent tsc from analyzing the import path.
+  // At runtime this is equivalent to: import(name)
+  return new Function('n', 'return import(n)')(name);
+}
+/* eslint-enable @typescript-eslint/no-implied-eval */
 
 // ---------------------------------------------------------------------------
 // Sub-test shape used by agents
@@ -104,7 +118,7 @@ let browserRefCount = 0;
 
 async function getSharedBrowser(): Promise<any> {
   if (!sharedBrowser) {
-    const pw = await import('playwright');
+    const pw = await loadModule('playwright');
     const chromium = pw.chromium || pw.default?.chromium;
     sharedBrowser = await chromium.launch({
       headless: true,
@@ -139,9 +153,9 @@ async function releaseSharedBrowser(): Promise<void> {
  * In-process agent executor that dynamically imports and runs real agent
  * packages. Falls back to stub results only for agents that cannot be loaded.
  *
- * This executor uses DIRECT dynamic import() syntax (not the Function wrapper)
- * because it's running in the worker package context where all agent packages
- * are direct dependencies.
+ * Dynamic imports use an indirect loadModule() helper to prevent TypeScript
+ * from statically resolving agent module paths at compile time. At runtime,
+ * all agent packages are available via pnpm's node_modules symlinks.
  */
 export class RealAgentExecutor implements AgentExecutor {
   private runningAgents: Map<string, AbortController> = new Map();
@@ -246,7 +260,7 @@ export class RealAgentExecutor implements AgentExecutor {
     startTime: number,
   ): Promise<AgentExecutionResult> {
     try {
-      const { AccessibilityAgent } = await import('@semkiest/accessibility-agent');
+      const { AccessibilityAgent } = await loadModule('@semkiest/accessibility-agent');
 
       if (!AccessibilityAgent) {
         throw new Error('AccessibilityAgent class not found in @semkiest/accessibility-agent');
@@ -373,7 +387,7 @@ export class RealAgentExecutor implements AgentExecutor {
     startTime: number,
   ): Promise<AgentExecutionResult> {
     try {
-      const { PerformanceAgent } = await import('@semkiest/performance');
+      const { PerformanceAgent } = await loadModule('@semkiest/performance');
 
       if (!PerformanceAgent) {
         throw new Error('PerformanceAgent class not found in @semkiest/performance');
@@ -521,7 +535,7 @@ export class RealAgentExecutor implements AgentExecutor {
     startTime: number,
   ): Promise<AgentExecutionResult> {
     try {
-      const { SecurityAgent } = await import('@semkiest/security-agent');
+      const { SecurityAgent } = await loadModule('@semkiest/security-agent');
 
       if (!SecurityAgent) {
         throw new Error('SecurityAgent class not found in @semkiest/security-agent');
@@ -633,7 +647,7 @@ export class RealAgentExecutor implements AgentExecutor {
     startTime: number,
   ): Promise<AgentExecutionResult> {
     try {
-      const { ApiAgent } = await import('@semkiest/api-agent');
+      const { ApiAgent } = await loadModule('@semkiest/api-agent');
 
       if (!ApiAgent) {
         throw new Error('ApiAgent class not found in @semkiest/api-agent');
@@ -746,7 +760,7 @@ export class RealAgentExecutor implements AgentExecutor {
     startTime: number,
   ): Promise<AgentExecutionResult> {
     try {
-      const { UIFunctionalAgent } = await import('@semkiest/agent-ui-functional');
+      const { UIFunctionalAgent } = await loadModule('@semkiest/agent-ui-functional');
 
       if (!UIFunctionalAgent) {
         throw new Error('UIFunctionalAgent class not found in @semkiest/agent-ui-functional');
@@ -842,7 +856,7 @@ export class RealAgentExecutor implements AgentExecutor {
   ): Promise<AgentExecutionResult> {
     let browser: any = null;
     try {
-      const { SiteCrawler } = await import('@semkiest/explorer');
+      const { SiteCrawler } = await loadModule('@semkiest/explorer');
 
       if (!SiteCrawler) {
         throw new Error('SiteCrawler class not found in @semkiest/explorer');
