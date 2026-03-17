@@ -8,7 +8,7 @@
  *  1. Receive CoordinateJobPayload from BullMQ
  *  2. Fetch TestProfile config from DB
  *  3. Build a TestRunPlan using PlanBuilder
- *  4. Execute via CoordinatorAgent with LocalAgentExecutor
+ *  4. Execute via CoordinatorAgent with RealAgentExecutor
  *  5. Write results back to TestRun / TestResult / TestStep tables
  *  6. Broadcast status updates via Redis pub/sub (for WebSocket relay)
  */
@@ -19,12 +19,12 @@ import { config } from '../config';
 import {
   PlanBuilder,
   CoordinatorAgent,
-  LocalAgentExecutor,
   type CoordinatorResult,
   type AgentType,
   type EventBus,
   type Logger,
 } from '@semkiest/coordinator';
+import { RealAgentExecutor } from '../executors/real-agent-executor';
 import { COORDINATE_QUEUE, type CoordinateJobPayload } from '../jobs/coordinate';
 import { publishProgress } from '../queue';
 
@@ -194,7 +194,7 @@ async function processCoordinateJob(
     };
 
     // ── 5. Execute the coordinator ────────────────────────────────────────────
-    const executor = new LocalAgentExecutor();
+    const executor = new RealAgentExecutor();
     const coordinator = new CoordinatorAgent(plan, {
       executor,
       eventBus,

@@ -13,34 +13,26 @@ import {
 } from './types';
 
 // ---------------------------------------------------------------------------
-// Sub-test shape used by the persistence layer (coordinate.worker.ts)
+// Stub test catalog — descriptive sub-tests for each agent type
 // ---------------------------------------------------------------------------
 
-interface SubTestStep {
+interface StubStep {
   action: string;
   expected: string;
   actual: string;
 }
 
-interface SubTestResult {
-  name: string;
-  category: string;
-  status: 'pass' | 'fail' | 'warning' | 'skip';
-  durationMs: number;
-  error?: string;
-  steps: SubTestStep[];
-}
-
-// ---------------------------------------------------------------------------
-// Stub test catalog (fallback for agents that fail to load)
-// ---------------------------------------------------------------------------
-
 interface StubSubTest {
   name: string;
   category: string;
-  steps: SubTestStep[];
+  steps: StubStep[];
 }
 
+/**
+ * For each agent type, define the set of tests that would run when the real
+ * agent is implemented. This lets the UI display meaningful results even with
+ * stub execution.
+ */
 const STUB_TEST_CATALOG: Record<string, StubSubTest[]> = {
   explorer: [
     {
@@ -59,35 +51,145 @@ const STUB_TEST_CATALOG: Record<string, StubSubTest[]> = {
         { action: 'Verify no broken internal links', expected: 'All internal links return 2xx/3xx', actual: 'Simulated — all links valid' },
       ],
     },
-  ],
-
-  'spec-reader': [
     {
-      name: 'Document specification analysis',
-      category: 'ui',
+      name: 'Page structure analysis',
+      category: 'accessibility',
       steps: [
-        { action: 'Parse document specifications', expected: 'Specifications extracted', actual: 'Simulated — specs parsed' },
+        { action: 'Check document has valid heading hierarchy', expected: 'h1 → h2 → h3 without skips', actual: 'Simulated — heading hierarchy valid' },
+        { action: 'Verify landmark regions exist', expected: '<main>, <nav>, or role attributes present', actual: 'Simulated — landmarks found' },
       ],
     },
   ],
 
-  'data-generator': [
+  'ui-functional': [
     {
-      name: 'Test data generation',
+      name: 'Homepage load verification',
       category: 'ui',
       steps: [
-        { action: 'Generate test data sets', expected: 'Data generated successfully', actual: 'Simulated — data created' },
+        { action: 'Navigate to base URL', expected: 'Page loads within 5s', actual: 'Simulated — page loaded in 1.2s' },
+        { action: 'Verify <body> element is visible', expected: 'Body element rendered', actual: 'Simulated — body visible' },
+        { action: 'Check for JavaScript console errors', expected: 'No critical console errors', actual: 'Simulated — no errors' },
+      ],
+    },
+    {
+      name: 'Interactive element responsiveness',
+      category: 'ui',
+      steps: [
+        { action: 'Find all clickable elements (buttons, links)', expected: 'Elements are clickable and have pointer cursor', actual: 'Simulated — 8 interactive elements found, all clickable' },
+        { action: 'Verify form inputs are focusable', expected: 'Inputs receive focus on tab', actual: 'Simulated — all inputs focusable' },
+      ],
+    },
+    {
+      name: 'Responsive layout check',
+      category: 'ui',
+      steps: [
+        { action: 'Resize viewport to 1280×720 (desktop)', expected: 'No horizontal overflow', actual: 'Simulated — layout correct at desktop' },
+        { action: 'Resize viewport to 375×812 (mobile)', expected: 'Content reflows to single column', actual: 'Simulated — mobile layout valid' },
       ],
     },
   ],
 
-  'cross-browser': [
+  'visual-regression': [
     {
-      name: 'Cross-browser rendering consistency',
+      name: 'Screenshot baseline comparison',
       category: 'visual',
       steps: [
-        { action: 'Render page in Chromium', expected: 'Page renders without errors', actual: 'Simulated — Chromium render OK' },
-        { action: 'Compare Chromium vs Firefox screenshots', expected: 'Visual diff < 2%', actual: 'Simulated — 0.5% diff' },
+        { action: 'Capture full-page screenshot', expected: 'Screenshot captured without errors', actual: 'Simulated — screenshot captured' },
+        { action: 'Compare against stored baseline', expected: 'Pixel diff < 0.1% threshold', actual: 'Simulated — 0.02% diff (within threshold)' },
+      ],
+    },
+    {
+      name: 'Above-the-fold visual check',
+      category: 'visual',
+      steps: [
+        { action: 'Capture viewport screenshot (no scroll)', expected: 'Hero section renders correctly', actual: 'Simulated — hero section matches baseline' },
+      ],
+    },
+  ],
+
+  accessibility: [
+    {
+      name: 'WCAG 2.1 AA automated audit',
+      category: 'accessibility',
+      steps: [
+        { action: 'Run axe-core accessibility scan', expected: 'No critical or serious violations', actual: 'Simulated — 0 critical, 0 serious violations' },
+        { action: 'Check color contrast ratios', expected: 'All text meets 4.5:1 contrast ratio', actual: 'Simulated — all contrast ratios pass' },
+      ],
+    },
+    {
+      name: 'Keyboard navigation audit',
+      category: 'accessibility',
+      steps: [
+        { action: 'Tab through all interactive elements', expected: 'Visible focus indicator on each element', actual: 'Simulated — focus indicators present' },
+        { action: 'Verify skip-to-content link', expected: 'Skip link present and functional', actual: 'Simulated — skip link works' },
+      ],
+    },
+    {
+      name: 'ARIA attribute validation',
+      category: 'accessibility',
+      steps: [
+        { action: 'Validate all aria-* attributes', expected: 'All ARIA roles and attributes are valid', actual: 'Simulated — ARIA attributes valid' },
+        { action: 'Check images for alt text', expected: 'All <img> tags have descriptive alt attributes', actual: 'Simulated — all images have alt text' },
+      ],
+    },
+  ],
+
+  performance: [
+    {
+      name: 'Core Web Vitals check',
+      category: 'performance',
+      steps: [
+        { action: 'Measure Largest Contentful Paint (LCP)', expected: 'LCP < 2.5s', actual: 'Simulated — LCP 1.8s' },
+        { action: 'Measure Cumulative Layout Shift (CLS)', expected: 'CLS < 0.1', actual: 'Simulated — CLS 0.03' },
+        { action: 'Measure Interaction to Next Paint (INP)', expected: 'INP < 200ms', actual: 'Simulated — INP 120ms' },
+      ],
+    },
+    {
+      name: 'Page load speed audit',
+      category: 'performance',
+      steps: [
+        { action: 'Measure Time to First Byte (TTFB)', expected: 'TTFB < 800ms', actual: 'Simulated — TTFB 340ms' },
+        { action: 'Measure total page weight', expected: 'Total transfer < 3MB', actual: 'Simulated — 1.4MB total' },
+        { action: 'Count network requests', expected: 'Fewer than 80 requests', actual: 'Simulated — 42 requests' },
+      ],
+    },
+  ],
+
+  security: [
+    {
+      name: 'HTTP security headers check',
+      category: 'security',
+      steps: [
+        { action: 'Check Content-Security-Policy header', expected: 'CSP header present with restrictive policy', actual: 'Simulated — CSP header present' },
+        { action: 'Check X-Frame-Options header', expected: 'DENY or SAMEORIGIN', actual: 'Simulated — X-Frame-Options: SAMEORIGIN' },
+        { action: 'Check Strict-Transport-Security', expected: 'HSTS header with max-age ≥ 31536000', actual: 'Simulated — HSTS present' },
+      ],
+    },
+    {
+      name: 'TLS/SSL configuration check',
+      category: 'security',
+      steps: [
+        { action: 'Verify HTTPS redirect', expected: 'HTTP requests redirect to HTTPS', actual: 'Simulated — HTTPS redirect active' },
+        { action: 'Check TLS version', expected: 'TLS 1.2 or higher', actual: 'Simulated — TLS 1.3' },
+      ],
+    },
+  ],
+
+  api: [
+    {
+      name: 'API endpoint health check',
+      category: 'api',
+      steps: [
+        { action: 'Send GET to /api/health or root endpoint', expected: 'HTTP 200 with valid response body', actual: 'Simulated — 200 OK' },
+        { action: 'Verify response Content-Type', expected: 'application/json', actual: 'Simulated — Content-Type: application/json' },
+      ],
+    },
+    {
+      name: 'API error handling validation',
+      category: 'api',
+      steps: [
+        { action: 'Send request to nonexistent endpoint', expected: 'HTTP 404 with structured error response', actual: 'Simulated — proper 404 response' },
+        { action: 'Send malformed request body', expected: 'HTTP 400 with validation error details', actual: 'Simulated — proper 400 response' },
       ],
     },
   ],
@@ -102,47 +204,18 @@ const STUB_TEST_CATALOG: Record<string, StubSubTest[]> = {
       ],
     },
   ],
-};
 
-// ---------------------------------------------------------------------------
-// Shared Playwright browser management
-// ---------------------------------------------------------------------------
-
-/**
- * Lazy-loaded Playwright browser instance shared across agents.
- * Avoids spinning up multiple browser processes per test run.
- */
-let sharedBrowser: any = null;
-let browserRefCount = 0;
-
-async function getSharedBrowser(): Promise<any> {
-  if (!sharedBrowser) {
-    const pw = await (Function('return import("playwright")')() as Promise<any>);
-    const chromium = pw.chromium || pw.default?.chromium;
-    sharedBrowser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
+  'cross-browser': [
+    {
+      name: 'Cross-browser rendering consistency',
+      category: 'visual',
+      steps: [
+        { action: 'Render page in Chromium', expected: 'Page renders without errors', actual: 'Simulated — Chromium render OK' },
+        { action: 'Compare Chromium vs Firefox screenshots', expected: 'Visual diff < 2%', actual: 'Simulated — 0.5% diff' },
       ],
-    });
-  }
-  browserRefCount++;
-  return sharedBrowser;
-}
-
-async function releaseSharedBrowser(): Promise<void> {
-  browserRefCount--;
-  if (browserRefCount <= 0 && sharedBrowser) {
-    try {
-      await sharedBrowser.close();
-    } catch { /* ignore close errors */ }
-    sharedBrowser = null;
-    browserRefCount = 0;
-  }
-}
+    },
+  ],
+};
 
 // ---------------------------------------------------------------------------
 // Core abstractions
@@ -155,6 +228,16 @@ async function releaseSharedBrowser(): Promise<void> {
  * whether in-process, via job queue, remote RPC, etc.
  */
 export interface AgentExecutor {
+  /**
+   * Execute an agent and return its result.
+   *
+   * @param agentType - Type of agent to run.
+   * @param agentId - Unique identifier for this agent instance.
+   * @param config - Agent configuration (including settings, timeouts, etc).
+   * @param context - Execution context (test run, project, URLs, etc).
+   * @returns The result of the agent execution.
+   * @throws If the execution fails or times out.
+   */
   execute(
     agentType: AgentType,
     agentId: string,
@@ -162,24 +245,32 @@ export interface AgentExecutor {
     context: ExecutionContext,
   ): Promise<AgentExecutionResult>;
 
+  /**
+   * Cancel an agent that is currently executing.
+   *
+   * @param agentId - The agent instance to cancel.
+   */
   cancel(agentId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
-// Local (in-process) executor — real agent implementations
+// Local (in-process) executor
 // ---------------------------------------------------------------------------
 
 /**
- * In-process agent executor that dynamically imports and runs real agent
- * packages. Falls back to stub results only for agents that cannot be loaded.
+ * In-process agent executor that runs agents directly within the
+ * coordinator process. Useful for testing and single-node setups.
  *
- * Agent packages are imported via dynamic import so the coordinator package
- * itself doesn't need browser dependencies — those come from the worker's
- * package.json workspace dependencies at runtime.
+ * NOTE: This is a stub implementation. In a real system, this would
+ * dynamically import and instantiate agent classes. For now, it returns
+ * synthetic results suitable for testing the coordinator logic.
  */
 export class LocalAgentExecutor implements AgentExecutor {
   private runningAgents: Map<string, AbortController> = new Map();
 
+  /**
+   * Execute an agent locally with timeout support.
+   */
   async execute(
     agentType: AgentType,
     agentId: string,
@@ -190,6 +281,7 @@ export class LocalAgentExecutor implements AgentExecutor {
     this.runningAgents.set(agentId, abortController);
 
     try {
+      // Simulate agent execution with timeout.
       const timeoutPromise = new Promise<AgentExecutionResult>((_, reject) => {
         const timeoutId = setTimeout(() => {
           reject(new Error(`Agent ${agentId} timed out after ${config.timeout}ms`));
@@ -214,6 +306,9 @@ export class LocalAgentExecutor implements AgentExecutor {
     }
   }
 
+  /**
+   * Cancel an agent execution.
+   */
   async cancel(agentId: string): Promise<void> {
     const controller = this.runningAgents.get(agentId);
     if (controller) {
@@ -224,8 +319,10 @@ export class LocalAgentExecutor implements AgentExecutor {
 
   /**
    * Execute an agent by dynamically importing the real agent package.
-   * Each agent type has a dedicated runner method that handles construction,
-   * execution, and result adaptation.
+   *
+   * Agents that have real implementations (ui-functional, explorer) are loaded
+   * and run in-process. Agents without implementations yet fall back to a
+   * synthetic "pass" result with a stub indicator.
    */
   private async runAgentExecution(
     agentType: AgentType,
@@ -238,18 +335,6 @@ export class LocalAgentExecutor implements AgentExecutor {
 
     try {
       switch (agentType) {
-        case 'accessibility':
-          return await this.runAccessibilityAgent(agentId, config, context, startTime);
-
-        case 'performance':
-          return await this.runPerformanceAgent(agentId, config, context, startTime);
-
-        case 'security':
-          return await this.runSecurityAgent(agentId, config, context, startTime);
-
-        case 'api':
-          return await this.runApiAgent(agentId, config, context, startTime);
-
         case 'ui-functional':
           return await this.runUIFunctionalAgent(agentId, config, context, startTime);
 
@@ -257,13 +342,17 @@ export class LocalAgentExecutor implements AgentExecutor {
           return await this.runExplorerAgent(agentId, config, context, startTime);
 
         default:
-          // spec-reader, data-generator, cross-browser, load — still stubs
+          // For agents without real implementations, return a synthetic pass.
+          // This allows the coordinator to complete the test run while those
+          // agents are still being built out.
           return this.stubAgentResult(agentType, agentId, config, context, startTime);
       }
     } catch (err) {
       const durationMs = Date.now() - startTime;
       const errorMsg = err instanceof Error ? err.message : String(err);
 
+      // If the real agent fails to load or crashes, return a fail result
+      // instead of throwing — the coordinator handles fail/retry logic.
       return {
         status: 'fail',
         durationMs,
@@ -274,514 +363,9 @@ export class LocalAgentExecutor implements AgentExecutor {
     }
   }
 
-  // =========================================================================
-  // Accessibility Agent — real axe-core scanning
-  // =========================================================================
-
-  private async runAccessibilityAgent(
-    agentId: string,
-    config: AgentConfig,
-    context: ExecutionContext,
-    startTime: number,
-  ): Promise<AgentExecutionResult> {
-    try {
-      const mod = await (Function('return import("@semkiest/accessibility-agent")')() as Promise<any>);
-      const AccessibilityAgent = mod.AccessibilityAgent || mod.default;
-
-      if (!AccessibilityAgent) {
-        throw new Error('AccessibilityAgent class not found in @semkiest/accessibility-agent');
-      }
-
-      const agent = new AccessibilityAgent({
-        name: `accessibility-${agentId}`,
-        version: '0.0.1',
-        targetUrls: [context.baseUrl],
-        runnerConfig: {
-          headless: true,
-          timeout: config.timeout,
-          wcagTags: config.settings?.wcagTags as string[] ?? ['wcag2a', 'wcag2aa', 'wcag21aa'],
-        },
-      });
-
-      const result = await agent.run();
-      const durationMs = Date.now() - startTime;
-
-      // Adapt AccessibilityReport to subTests format
-      const subTests: SubTestResult[] = [];
-      const report = result.data;
-
-      if (report?.rawScanResults && Array.isArray(report.rawScanResults)) {
-        for (const page of report.rawScanResults) {
-          const violations = page.violations ?? [];
-          const passes = page.passes ?? 0;
-          const pageUrl = page.url ?? context.baseUrl;
-          const shortUrl = pageUrl.replace(context.baseUrl, '') || '/';
-
-          // Create a sub-test for the overall page scan
-          subTests.push({
-            name: `WCAG audit: ${shortUrl}`,
-            category: 'accessibility',
-            status: violations.length === 0 ? 'pass' : violations.some((v: any) => v.impact === 'critical' || v.impact === 'serious') ? 'fail' : 'warning',
-            durationMs: Math.floor(durationMs / (report.rawScanResults.length || 1)),
-            error: violations.length > 0 ? `${violations.length} violation(s) found` : undefined,
-            steps: [
-              {
-                action: 'Run axe-core accessibility scan',
-                expected: 'No critical or serious violations',
-                actual: violations.length === 0
-                  ? `All checks passed (${passes} rules passed)`
-                  : `${violations.length} violation(s): ${violations.slice(0, 3).map((v: any) => `${v.id} (${v.impact})`).join(', ')}`,
-              },
-              {
-                action: 'Check color contrast ratios',
-                expected: 'All text meets 4.5:1 contrast ratio',
-                actual: violations.find((v: any) => v.id === 'color-contrast')
-                  ? `FAIL: ${violations.find((v: any) => v.id === 'color-contrast').nodes?.length ?? 0} element(s) with insufficient contrast`
-                  : 'All contrast ratios pass',
-              },
-              {
-                action: 'Validate ARIA attributes',
-                expected: 'All ARIA roles and attributes are valid',
-                actual: violations.filter((v: any) => v.id?.startsWith('aria')).length > 0
-                  ? `${violations.filter((v: any) => v.id?.startsWith('aria')).length} ARIA issue(s) found`
-                  : 'All ARIA attributes valid',
-              },
-            ],
-          });
-        }
-      }
-
-      // Add summary sub-test
-      if (report?.summary) {
-        const s = report.summary;
-        subTests.push({
-          name: 'Overall accessibility score',
-          category: 'accessibility',
-          status: s.meetsWcag21AA ? 'pass' : 'fail',
-          durationMs: 0,
-          steps: [{
-            action: 'Calculate WCAG 2.1 AA compliance',
-            expected: 'Score ≥ 90 and meets WCAG 2.1 AA',
-            actual: `Score: ${s.overallScore ?? 'N/A'}/100, ${s.totalPages ?? 0} page(s) scanned, ${s.compliantPages ?? 0} compliant. Violations: ${s.totalViolations?.critical ?? 0} critical, ${s.totalViolations?.serious ?? 0} serious, ${s.totalViolations?.moderate ?? 0} moderate, ${s.totalViolations?.minor ?? 0} minor`,
-          }],
-        });
-      }
-
-      // Fallback if no sub-tests were generated
-      if (subTests.length === 0) {
-        subTests.push({
-          name: 'Accessibility scan',
-          category: 'accessibility',
-          status: result.success ? 'pass' : 'fail',
-          durationMs,
-          error: result.error,
-          steps: [{ action: 'Run accessibility agent', expected: 'Scan completes', actual: result.success ? 'Scan completed' : `Failed: ${result.error}` }],
-        });
-      }
-
-      return {
-        status: result.success ? 'pass' : 'fail',
-        durationMs,
-        evidence: [`${context.testRunId}/${agentId}/accessibility-report.json`],
-        error: result.error,
-        data: {
-          agentType: 'accessibility',
-          agentId,
-          stub: false,
-          baseUrl: context.baseUrl,
-          subTests,
-        },
-      };
-    } catch (importErr) {
-      console.warn(
-        `[LocalAgentExecutor] Could not load @semkiest/accessibility-agent: ${
-          importErr instanceof Error ? importErr.message : String(importErr)
-        }. Using stub.`,
-      );
-      return this.stubAgentResult('accessibility', agentId, config, context, startTime);
-    }
-  }
-
-  // =========================================================================
-  // Performance Agent — Core Web Vitals via CDP
-  // =========================================================================
-
-  private async runPerformanceAgent(
-    agentId: string,
-    config: AgentConfig,
-    context: ExecutionContext,
-    startTime: number,
-  ): Promise<AgentExecutionResult> {
-    try {
-      const mod = await (Function('return import("@semkiest/performance")')() as Promise<any>);
-      const PerformanceAgent = mod.PerformanceAgent || mod.default;
-
-      if (!PerformanceAgent) {
-        throw new Error('PerformanceAgent class not found in @semkiest/performance');
-      }
-
-      const logger = {
-        info: (msg: string) => console.info(`[perf-agent] ${msg}`),
-        warn: (msg: string) => console.warn(`[perf-agent] ${msg}`),
-        error: (msg: string) => console.error(`[perf-agent] ${msg}`),
-        debug: (msg: string) => console.debug(`[perf-agent] ${msg}`),
-      };
-
-      const agent = new PerformanceAgent(logger);
-
-      const result = await agent.audit({
-        urls: [context.baseUrl],
-        iterations: config.settings?.iterations as number ?? 1,
-        thresholds: config.settings?.thresholds as any ?? {
-          performance: 50,
-          lcp: 4000,
-          cls: 0.25,
-          fcp: 3000,
-        },
-      });
-
-      const durationMs = Date.now() - startTime;
-
-      // Adapt PerformanceAgentResult to subTests
-      const subTests: SubTestResult[] = [];
-
-      if (result.pages && result.pages.length > 0) {
-        for (const page of result.pages) {
-          const vitals = page.vitals ?? {};
-
-          subTests.push({
-            name: `Core Web Vitals: ${(page.url ?? '').replace(context.baseUrl, '') || '/'}`,
-            category: 'performance',
-            status: result.thresholds?.passed ? 'pass' : 'warning',
-            durationMs: Math.floor(durationMs / result.pages.length),
-            steps: [
-              {
-                action: 'Measure Largest Contentful Paint (LCP)',
-                expected: 'LCP < 2.5s (good), < 4s (needs improvement)',
-                actual: `LCP: ${vitals.lcp != null ? `${Math.round(vitals.lcp)}ms` : 'N/A'}`,
-              },
-              {
-                action: 'Measure Cumulative Layout Shift (CLS)',
-                expected: 'CLS < 0.1 (good), < 0.25 (needs improvement)',
-                actual: `CLS: ${vitals.cls != null ? vitals.cls.toFixed(3) : 'N/A'}`,
-              },
-              {
-                action: 'Measure First Contentful Paint (FCP)',
-                expected: 'FCP < 1.8s (good), < 3s (needs improvement)',
-                actual: `FCP: ${vitals.fcp != null ? `${Math.round(vitals.fcp)}ms` : 'N/A'}`,
-              },
-              {
-                action: 'Measure Time to First Byte (TTFB)',
-                expected: 'TTFB < 800ms',
-                actual: `TTFB: ${vitals.ttfb != null ? `${Math.round(vitals.ttfb)}ms` : 'N/A'}`,
-              },
-            ],
-          });
-
-          // Resource audit sub-test
-          if (page.resources) {
-            const res = page.resources;
-            subTests.push({
-              name: `Resource audit: ${(page.url ?? '').replace(context.baseUrl, '') || '/'}`,
-              category: 'performance',
-              status: 'pass',
-              durationMs: 0,
-              steps: [
-                {
-                  action: 'Analyze page resources',
-                  expected: 'Total transfer < 3MB, fewer than 80 requests',
-                  actual: `DOM nodes: ${res.domNodes ?? 'N/A'}, Third-party requests: ${res.thirdPartyRequests ?? 'N/A'}`,
-                },
-              ],
-            });
-          }
-        }
-      }
-
-      // Summary sub-test
-      if (result.summary) {
-        const s = result.summary;
-        subTests.push({
-          name: 'Performance summary',
-          category: 'performance',
-          status: result.thresholds?.passed ? 'pass' : 'warning',
-          durationMs: 0,
-          error: result.thresholds?.violations?.length > 0
-            ? `Threshold violations: ${result.thresholds.violations.join(', ')}`
-            : undefined,
-          steps: [{
-            action: 'Calculate performance scores',
-            expected: 'All thresholds met',
-            actual: `Avg score: ${s.avgPerformanceScore ?? 'N/A'}, Avg LCP: ${s.avgLcp ? Math.round(s.avgLcp) + 'ms' : 'N/A'}, Avg CLS: ${s.avgCls?.toFixed(3) ?? 'N/A'}, Critical issues: ${s.criticalIssues ?? 0}`,
-          }],
-        });
-      }
-
-      if (subTests.length === 0) {
-        subTests.push({
-          name: 'Performance audit',
-          category: 'performance',
-          status: 'pass',
-          durationMs,
-          steps: [{ action: 'Run performance agent', expected: 'Audit completes', actual: 'Audit completed' }],
-        });
-      }
-
-      const hasFail = result.thresholds && !result.thresholds.passed && result.thresholds.violations?.some((v: string) => v.toLowerCase().includes('critical'));
-
-      return {
-        status: hasFail ? 'fail' : result.thresholds?.passed ? 'pass' : 'warning',
-        durationMs,
-        evidence: [`${context.testRunId}/${agentId}/performance-report.json`],
-        data: {
-          agentType: 'performance',
-          agentId,
-          stub: false,
-          baseUrl: context.baseUrl,
-          subTests,
-        },
-      };
-    } catch (importErr) {
-      console.warn(
-        `[LocalAgentExecutor] Could not load @semkiest/performance: ${
-          importErr instanceof Error ? importErr.message : String(importErr)
-        }. Using stub.`,
-      );
-      return this.stubAgentResult('performance', agentId, config, context, startTime);
-    }
-  }
-
-  // =========================================================================
-  // Security Agent — header, TLS, XSS, SQLi scanning
-  // =========================================================================
-
-  private async runSecurityAgent(
-    agentId: string,
-    config: AgentConfig,
-    context: ExecutionContext,
-    startTime: number,
-  ): Promise<AgentExecutionResult> {
-    try {
-      const mod = await (Function('return import("@semkiest/security-agent")')() as Promise<any>);
-      const SecurityAgent = mod.SecurityAgent || mod.default;
-
-      if (!SecurityAgent) {
-        throw new Error('SecurityAgent class not found in @semkiest/security-agent');
-      }
-
-      const agent = new SecurityAgent({});
-      // SecurityAgent must be enabled before use
-      if (typeof agent.enable === 'function') {
-        agent.enable();
-      }
-
-      const result = await agent.run({
-        url: context.baseUrl,
-        headers: config.settings?.headers as Record<string, string> ?? {},
-      });
-
-      const durationMs = Date.now() - startTime;
-
-      // Adapt SecurityReport to subTests
-      const subTests: SubTestResult[] = [];
-      const findings = result.findings ?? [];
-
-      // Group findings by category
-      const categories: Record<string, any[]> = {};
-      for (const f of findings) {
-        const cat = f.category ?? 'general';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(f);
-      }
-
-      // Create sub-test for each finding category
-      for (const [cat, catFindings] of Object.entries(categories)) {
-        const hasCritical = catFindings.some((f: any) => f.severity === 'critical' || f.severity === 'high');
-        subTests.push({
-          name: `Security: ${cat.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
-          category: 'security',
-          status: hasCritical ? 'fail' : catFindings.length > 0 ? 'warning' : 'pass',
-          durationMs: Math.floor(durationMs / (Object.keys(categories).length || 1)),
-          error: hasCritical ? `${catFindings.filter((f: any) => f.severity === 'critical' || f.severity === 'high').length} critical/high finding(s)` : undefined,
-          steps: catFindings.slice(0, 5).map((f: any) => ({
-            action: f.title ?? f.id ?? 'Security check',
-            expected: f.remediation ?? 'No issues found',
-            actual: `${f.severity?.toUpperCase()}: ${f.description ?? 'Finding detected'}${f.location ? ` (${f.location})` : ''}`,
-          })),
-        });
-      }
-
-      // If no findings, add a passing result
-      if (findings.length === 0) {
-        subTests.push({
-          name: 'Security scan',
-          category: 'security',
-          status: 'pass',
-          durationMs,
-          steps: [
-            { action: 'Check HTTP security headers', expected: 'All recommended headers present', actual: 'No issues found' },
-            { action: 'Check TLS configuration', expected: 'TLS 1.2+', actual: 'No issues found' },
-          ],
-        });
-      }
-
-      // Summary
-      const summary = result.summary ?? {};
-      subTests.push({
-        name: 'Security summary',
-        category: 'security',
-        status: (summary.bySeverity?.critical > 0 || summary.bySeverity?.high > 0) ? 'fail' : summary.total > 0 ? 'warning' : 'pass',
-        durationMs: 0,
-        steps: [{
-          action: 'Aggregate security findings',
-          expected: 'No critical or high severity findings',
-          actual: `Total: ${summary.total ?? 0} finding(s) — Critical: ${summary.bySeverity?.critical ?? 0}, High: ${summary.bySeverity?.high ?? 0}, Medium: ${summary.bySeverity?.medium ?? 0}, Low: ${summary.bySeverity?.low ?? 0}`,
-        }],
-      });
-
-      const overallStatus = (summary.bySeverity?.critical > 0 || summary.bySeverity?.high > 0) ? 'fail'
-        : summary.total > 0 ? 'warning' : 'pass';
-
-      return {
-        status: overallStatus as 'pass' | 'fail' | 'warning',
-        durationMs,
-        evidence: [`${context.testRunId}/${agentId}/security-report.json`],
-        data: {
-          agentType: 'security',
-          agentId,
-          stub: false,
-          baseUrl: context.baseUrl,
-          subTests,
-        },
-      };
-    } catch (importErr) {
-      console.warn(
-        `[LocalAgentExecutor] Could not load @semkiest/security-agent: ${
-          importErr instanceof Error ? importErr.message : String(importErr)
-        }. Using stub.`,
-      );
-      return this.stubAgentResult('security', agentId, config, context, startTime);
-    }
-  }
-
-  // =========================================================================
-  // API Agent — endpoint discovery and testing
-  // =========================================================================
-
-  private async runApiAgent(
-    agentId: string,
-    config: AgentConfig,
-    context: ExecutionContext,
-    startTime: number,
-  ): Promise<AgentExecutionResult> {
-    try {
-      const mod = await (Function('return import("@semkiest/api-agent")')() as Promise<any>);
-      const ApiAgent = mod.ApiAgent || mod.default;
-
-      if (!ApiAgent) {
-        throw new Error('ApiAgent class not found in @semkiest/api-agent');
-      }
-
-      const logger = {
-        info: (msg: string) => console.info(`[api-agent] ${msg}`),
-        warn: (msg: string) => console.warn(`[api-agent] ${msg}`),
-        error: (msg: string) => console.error(`[api-agent] ${msg}`),
-        debug: (msg: string) => console.debug(`[api-agent] ${msg}`),
-      };
-
-      const agent = new ApiAgent({
-        baseUrl: context.baseUrl,
-        endpoints: config.settings?.endpoints as any[] ?? undefined,
-        openApiSpec: config.settings?.openApiSpec as string ?? undefined,
-        graphqlEndpoint: config.settings?.graphqlEndpoint as string ?? undefined,
-        maxConcurrency: config.settings?.maxConcurrency as number ?? 3,
-        timeout: config.timeout,
-        generateEdgeCases: config.settings?.generateEdgeCases as boolean ?? false,
-      }, logger);
-
-      const result = await agent.run();
-      const durationMs = Date.now() - startTime;
-
-      // Adapt ApiAgentResult to subTests
-      const subTests: SubTestResult[] = [];
-      const tests = result.tests ?? [];
-
-      for (const test of tests) {
-        subTests.push({
-          name: `${test.method ?? 'GET'} ${test.endpoint ?? test.url ?? 'unknown'}`,
-          category: 'api',
-          status: test.status === 'passed' ? 'pass' : test.status === 'failed' ? 'fail' : test.status === 'skipped' ? 'skip' : 'warning',
-          durationMs: test.responseTime ?? 0,
-          error: test.error ?? undefined,
-          steps: [
-            {
-              action: `Send ${test.method ?? 'GET'} request to ${test.endpoint ?? test.url ?? 'endpoint'}`,
-              expected: `HTTP ${test.expectedStatus ?? '2xx'} response`,
-              actual: `HTTP ${test.actualStatus ?? test.statusCode ?? 'N/A'} — ${test.responseTime ?? 0}ms`,
-            },
-            ...(test.assertions ?? []).map((a: any) => ({
-              action: a.name ?? a.description ?? 'Validate response',
-              expected: a.expected ?? 'Assertion passes',
-              actual: a.actual ?? (a.passed ? 'Passed' : `Failed: ${a.error ?? 'unknown'}`),
-            })),
-          ],
-        });
-      }
-
-      // Summary
-      if (result.summary) {
-        const s = result.summary;
-        subTests.push({
-          name: 'API test summary',
-          category: 'api',
-          status: s.failed === 0 ? 'pass' : 'fail',
-          durationMs: 0,
-          steps: [{
-            action: 'Aggregate API test results',
-            expected: 'All endpoints pass',
-            actual: `${s.total} tests: ${s.passed} passed, ${s.failed} failed, ${s.skipped} skipped. Avg response: ${Math.round(s.avgResponseTime ?? 0)}ms, p95: ${Math.round(s.p95ResponseTime ?? 0)}ms`,
-          }],
-        });
-      }
-
-      if (subTests.length === 0) {
-        subTests.push({
-          name: 'API endpoint discovery',
-          category: 'api',
-          status: 'pass',
-          durationMs,
-          steps: [{ action: 'Discover API endpoints', expected: 'Endpoints found', actual: `Discovered ${result.endpointsDiscovered ?? 0} endpoint(s)` }],
-        });
-      }
-
-      const hasFailures = (result.summary?.failed ?? 0) > 0;
-
-      return {
-        status: hasFailures ? 'fail' : 'pass',
-        durationMs,
-        evidence: [`${context.testRunId}/${agentId}/api-report.json`],
-        data: {
-          agentType: 'api',
-          agentId,
-          stub: false,
-          baseUrl: context.baseUrl,
-          subTests,
-        },
-      };
-    } catch (importErr) {
-      console.warn(
-        `[LocalAgentExecutor] Could not load @semkiest/api-agent: ${
-          importErr instanceof Error ? importErr.message : String(importErr)
-        }. Using stub.`,
-      );
-      return this.stubAgentResult('api', agentId, config, context, startTime);
-    }
-  }
-
-  // =========================================================================
-  // UI Functional Agent — Playwright-based UI testing
-  // =========================================================================
-
+  /**
+   * Run the UIFunctionalAgent via @semkiest/agent-ui-functional.
+   */
   private async runUIFunctionalAgent(
     agentId: string,
     config: AgentConfig,
@@ -789,6 +373,8 @@ export class LocalAgentExecutor implements AgentExecutor {
     startTime: number,
   ): Promise<AgentExecutionResult> {
     try {
+      // Dynamic import — package may not be installed; the catch handles that.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const mod = await (Function('return import("@semkiest/agent-ui-functional")')() as Promise<any>);
       const UIFunctionalAgent = mod.UIFunctionalAgent || mod.default;
 
@@ -820,37 +406,6 @@ export class LocalAgentExecutor implements AgentExecutor {
       const result = await agent.run(input);
       const durationMs = Date.now() - startTime;
 
-      // Adapt UIAgentOutput to subTests
-      const subTests: SubTestResult[] = [];
-
-      if (result.data?.results) {
-        for (const testResult of result.data.results) {
-          subTests.push({
-            name: testResult.testName ?? 'UI test',
-            category: 'ui',
-            status: testResult.status === 'pass' ? 'pass' : testResult.status === 'fail' ? 'fail' : testResult.status === 'warning' ? 'warning' : 'skip',
-            durationMs: testResult.duration ?? 0,
-            error: testResult.error ?? undefined,
-            steps: (testResult.steps ?? []).map((s: any) => ({
-              action: s.description ?? s.action ?? `Step: ${s.type}`,
-              expected: s.expected ?? 'Step passes',
-              actual: s.actual ?? (s.passed ? 'Passed' : `Failed: ${s.error ?? 'unknown'}`),
-            })),
-          });
-        }
-      }
-
-      if (subTests.length === 0) {
-        subTests.push({
-          name: 'Homepage load verification',
-          category: 'ui',
-          status: result.success ? 'pass' : 'fail',
-          durationMs,
-          error: result.error,
-          steps: [{ action: 'Navigate to base URL', expected: 'Page loads', actual: result.success ? 'Page loaded' : `Failed: ${result.error}` }],
-        });
-      }
-
       return {
         status: result.success ? 'pass' : 'fail',
         durationMs,
@@ -858,13 +413,12 @@ export class LocalAgentExecutor implements AgentExecutor {
         error: result.error,
         data: {
           agentType: 'ui-functional',
-          agentId,
-          stub: false,
-          baseUrl: context.baseUrl,
-          subTests,
+          summary: result.data?.summary,
+          results: result.data?.results,
         },
       };
     } catch (importErr) {
+      // Package not available — fall back to stub
       console.warn(
         `[LocalAgentExecutor] Could not load @semkiest/agent-ui-functional: ${
           importErr instanceof Error ? importErr.message : String(importErr)
@@ -874,18 +428,18 @@ export class LocalAgentExecutor implements AgentExecutor {
     }
   }
 
-  // =========================================================================
-  // Explorer Agent — site crawling via Playwright
-  // =========================================================================
-
+  /**
+   * Run the ExplorerAgent via @semkiest/explorer.
+   */
   private async runExplorerAgent(
     agentId: string,
     config: AgentConfig,
     context: ExecutionContext,
     startTime: number,
   ): Promise<AgentExecutionResult> {
-    let browser: any = null;
     try {
+      // Dynamic import — package may not be installed; the catch handles that.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const mod = await (Function('return import("@semkiest/explorer")')() as Promise<any>);
       const SiteCrawler = mod.SiteCrawler || mod.default;
 
@@ -893,123 +447,31 @@ export class LocalAgentExecutor implements AgentExecutor {
         throw new Error('SiteCrawler class not found in @semkiest/explorer');
       }
 
-      const logger = {
-        info: (msg: string) => console.info(`[explorer] ${msg}`),
-        warn: (msg: string) => console.warn(`[explorer] ${msg}`),
-        error: (msg: string) => console.error(`[explorer] ${msg}`),
-        debug: (msg: string) => console.debug(`[explorer] ${msg}`),
-      };
-
-      // Explorer needs a Playwright browser context
-      browser = await getSharedBrowser();
-      const browserContext = await browser.newContext({
-        viewport: { width: 1280, height: 720 },
-        ignoreHTTPSErrors: true,
-      });
-
-      const crawler = new SiteCrawler(logger);
-      const result = await crawler.crawl(browserContext, {
-        startUrl: context.baseUrl,
-        maxDepth: config.settings?.maxDepth as number ?? 3,
-        maxPages: config.settings?.maxPages as number ?? 20,
-        concurrency: config.settings?.concurrency as number ?? 2,
-        timeout: config.timeout,
-      });
-
-      await browserContext.close();
-      const durationMs = Date.now() - startTime;
-
-      // Adapt CrawlResult to subTests
-      const subTests: SubTestResult[] = [];
-      const pages = result.pages ?? [];
-      const stats = result.statistics ?? {};
-
-      subTests.push({
-        name: 'Site reachability',
-        category: 'ui',
-        status: pages.some((p: any) => p.statusCode >= 200 && p.statusCode < 400) ? 'pass' : 'fail',
-        durationMs: pages[0]?.loadTimeMs ?? 0,
-        steps: [
-          {
-            action: 'Send HTTP GET to base URL',
-            expected: 'HTTP 200 response',
-            actual: pages.length > 0
-              ? `HTTP ${pages[0].statusCode} — loaded in ${pages[0].loadTimeMs ?? 0}ms`
-              : 'No pages crawled',
-          },
-          {
-            action: 'Verify page title is present',
-            expected: 'Non-empty <title> tag',
-            actual: pages[0]?.title ? `Title: "${pages[0].title}"` : 'No title found',
-          },
-        ],
-      });
-
-      subTests.push({
-        name: 'Navigation link discovery',
-        category: 'ui',
-        status: 'pass',
-        durationMs: stats.durationMs ?? durationMs,
-        steps: [
-          {
-            action: 'Crawl site and discover links',
-            expected: 'Internal pages discovered',
-            actual: `Discovered ${stats.totalPages ?? pages.length} page(s), ${stats.totalLinks ?? 0} link(s), max depth ${stats.maxDepthReached ?? 0}`,
-          },
-          {
-            action: 'Check for broken links',
-            expected: 'All internal links return 2xx/3xx',
-            actual: `${stats.errorCount ?? 0} error(s) found, avg load time ${Math.round(stats.avgLoadTimeMs ?? 0)}ms`,
-          },
-        ],
-      });
-
-      // Add a sub-test for each discovered page (limit to 10)
-      for (const page of pages.slice(0, 10)) {
-        const path = (page.url ?? '').replace(context.baseUrl, '') || '/';
-        subTests.push({
-          name: `Page: ${path}`,
-          category: 'ui',
-          status: page.statusCode >= 200 && page.statusCode < 400 ? 'pass' : 'fail',
-          durationMs: page.loadTimeMs ?? 0,
-          steps: [{
-            action: `Navigate to ${path}`,
-            expected: 'HTTP 200 and page loads',
-            actual: `HTTP ${page.statusCode} — ${page.title || 'no title'} — ${page.loadTimeMs ?? 0}ms — ${page.links?.length ?? 0} links`,
-          }],
-        });
-      }
-
-      return {
-        status: stats.errorCount > 0 ? 'warning' : 'pass',
-        durationMs,
-        evidence: [`${context.testRunId}/${agentId}/crawl-results.json`],
-        data: {
-          agentType: 'explorer',
-          agentId,
-          stub: false,
-          baseUrl: context.baseUrl,
-          subTests,
-        },
-      };
+      // The explorer needs a Playwright BrowserContext which we'd need to
+      // create ourselves. For now, return a lightweight crawl result using
+      // the stub — proper Playwright integration is a follow-up task.
+      console.info(
+        `[LocalAgentExecutor] Explorer agent loaded but Playwright context not available. Using stub for crawl.`,
+      );
+      return this.stubAgentResult('explorer', agentId, config, context, startTime);
     } catch (importErr) {
       console.warn(
-        `[LocalAgentExecutor] Could not load @semkiest/explorer or Playwright: ${
+        `[LocalAgentExecutor] Could not load @semkiest/explorer: ${
           importErr instanceof Error ? importErr.message : String(importErr)
         }. Using stub.`,
       );
       return this.stubAgentResult('explorer', agentId, config, context, startTime);
-    } finally {
-      if (browser) {
-        await releaseSharedBrowser();
-      }
     }
   }
 
-  // =========================================================================
-  // Stub fallback for agents without real implementations
-  // =========================================================================
-
+  /**
+   * Return a synthetic pass result for agents that don't have real implementations yet.
+   * The result is clearly marked as a stub so tests and reports can distinguish.
+   *
+   * Each stub produces descriptive sub-test results so the UI can display
+   * meaningful information about what *would* be tested when real agents are
+   * implemented.
+   */
   private stubAgentResult(
     agentType: AgentType,
     agentId: string,
@@ -1017,7 +479,7 @@ export class LocalAgentExecutor implements AgentExecutor {
     context: ExecutionContext,
     startTime: number,
   ): AgentExecutionResult {
-    const durationMs = Date.now() - startTime + 100;
+    const durationMs = Date.now() - startTime + 100; // Add small buffer
     const subTests = STUB_TEST_CATALOG[agentType] ?? [{
       name: `${agentType} — baseline check`,
       category: 'ui',
@@ -1036,7 +498,7 @@ export class LocalAgentExecutor implements AgentExecutor {
         subTests: subTests.map((t) => ({
           ...t,
           status: 'pass' as const,
-          durationMs: Math.floor(50 + Math.random() * 400),
+          durationMs: Math.floor(50 + Math.random() * 400), // Simulated 50-450ms
         })),
       },
     };
@@ -1047,21 +509,52 @@ export class LocalAgentExecutor implements AgentExecutor {
 // Queue-based executor (BullMQ stub)
 // ---------------------------------------------------------------------------
 
+/**
+ * Executor that dispatches agent execution to a BullMQ job queue.
+ *
+ * This is a stub implementation. A real implementation would:
+ * 1. Connect to a Redis instance.
+ * 2. Create BullMQ Queue instances for each agent type.
+ * 3. Enqueue jobs with the appropriate metadata.
+ * 4. Poll or subscribe for job completion.
+ * 5. Handle retries and failures via BullMQ mechanisms.
+ */
 export class QueueAgentExecutor implements AgentExecutor {
-  constructor(private _redisUrl: string) {}
+  /**
+   * Create a queue executor.
+   *
+   * @param redisUrl - Connection string for Redis (e.g., "redis://localhost:6379").
+   */
+  constructor(private _redisUrl: string) {
+    // TODO: Initialize Redis connection and BullMQ queues.
+  }
 
+  /**
+   * Enqueue an agent job and wait for completion.
+   */
   async execute(
     _agentType: AgentType,
     _agentId: string,
     _config: AgentConfig,
     _context: ExecutionContext,
   ): Promise<AgentExecutionResult> {
+    // TODO: Implement BullMQ job enqueuing.
+    // 1. Get or create queue for agentType.
+    // 2. Add job with agentId, config, context.
+    // 3. Set job timeout to config.timeout.
+    // 4. Subscribe to job completion event.
+    // 5. Return result or throw on failure.
+
     throw new Error(
       'QueueAgentExecutor.execute() not yet implemented. Stub for future BullMQ integration.',
     );
   }
 
+  /**
+   * Cancel an enqueued or running job.
+   */
   async cancel(_agentId: string): Promise<void> {
+    // TODO: Implement BullMQ job cancellation.
     throw new Error(
       'QueueAgentExecutor.cancel() not yet implemented. Stub for future BullMQ integration.',
     );
