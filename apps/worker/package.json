@@ -15,6 +15,13 @@
     "@semkiest/shared-config": "workspace:*",
     "@semkiest/shared-types": "workspace:*",
     "@semkiest/shared-utils": "workspace:*",
+    "@semkiest/accessibility-agent": "workspace:*",
+    "@semkiest/performance": "workspace:*",
+    "@semkiest/security-agent": "workspace:*",
+    "@semkiest/api-agent": "workspace:*",
+    "@semkiest/agent-ui-functional": "workspace:*",
+    "@semkiest/explorer": "workspace:*",
+    "playwright": "^1.44.0",
     "@sentry/node": "^8.0.0",
     "bullmq": "^5.0.0",
     "ioredis": "^5.3.0"

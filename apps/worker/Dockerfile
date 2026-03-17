@@ -1,16 +1,22 @@
 # =============================================================================
 # Worker Service Dockerfile - multi-stage build
 # Build context must be the monorepo root.
+#
+# Uses Debian-based Node image (not Alpine) because Playwright requires glibc
+# and system libraries not available on Alpine.
 # =============================================================================
 
 # -- Stage 1: Build --------------------------------------------------------
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
-# Install OpenSSL for Prisma (required for PostgreSQL connectivity)
-RUN apk add --no-cache openssl
+# Install build dependencies for Prisma and native modules
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy entire monorepo
 COPY . .
@@ -26,24 +32,66 @@ RUN cd packages/db && npx prisma generate && cd /app && \
     pnpm --filter @semkiest/shared-types build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
     pnpm --filter @semkiest/db build 2>/dev/null || true && \
+    pnpm --filter @semkiest/agent-base build 2>/dev/null || true && \
+    pnpm --filter @semkiest/accessibility-agent build 2>/dev/null || true && \
+    pnpm --filter @semkiest/performance build 2>/dev/null || true && \
+    pnpm --filter @semkiest/security-agent build 2>/dev/null || true && \
+    pnpm --filter @semkiest/api-agent build 2>/dev/null || true && \
+    pnpm --filter @semkiest/agent-ui-functional build 2>/dev/null || true && \
+    pnpm --filter @semkiest/explorer build 2>/dev/null || true && \
     pnpm --filter @semkiest/coordinator build 2>/dev/null || true && \
     pnpm --filter @semkiest/worker build || true
 
 # -- Stage 2: Production runtime -------------------------------------------
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init openssl
+# Install runtime dependencies:
+# - dumb-init: proper PID 1 signal handling
+# - openssl: required by Prisma
+# - Playwright system dependencies for Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dumb-init \
+    openssl \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libxshmfence1 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 semkiest
+    adduser --system --uid 1001 --ingroup nodejs semkiest
 
 # Copy the full built workspace (preserves pnpm symlink structure)
 COPY --from=builder --chown=semkiest:nodejs /app .
 
+# Install Playwright Chromium browser (as the app user)
+# Only Chromium is needed — Firefox and WebKit are not used by default
 USER semkiest
+RUN npx playwright install chromium 2>/dev/null || true
 
 ARG BUILD_DATE
 ARG GIT_SHA
