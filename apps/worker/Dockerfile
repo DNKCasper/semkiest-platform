@@ -36,16 +36,27 @@ RUN pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
     pnpm --filter @semkiest/db build 2>/dev/null || true
 
-# Agent packages — errors are logged (not suppressed) but non-blocking
-RUN echo "=== Building agent packages ===" && \
-    pnpm --filter @semkiest/agent-base build || echo "WARN: agent-base build failed" && \
-    pnpm --filter @semkiest/accessibility-agent build || echo "WARN: accessibility-agent build failed" && \
-    pnpm --filter @semkiest/performance build || echo "WARN: performance build failed" && \
-    pnpm --filter @semkiest/security-agent build || echo "WARN: security-agent build failed" && \
-    pnpm --filter @semkiest/api-agent build || echo "WARN: api-agent build failed" && \
-    pnpm --filter @semkiest/agent-ui-functional build || echo "WARN: agent-ui-functional build failed" && \
-    pnpm --filter @semkiest/explorer build || echo "WARN: explorer build failed" && \
-    echo "=== Agent package builds complete ==="
+# Agent packages — compile with tsc directly to avoid tsup/rollup native binary issues.
+# tsup depends on rollup which needs platform-specific binaries (@rollup/rollup-linux-x64-gnu)
+# that may not resolve correctly in all build environments. tsc is always available and
+# produces the same dist/index.js output that loadModule() needs at runtime.
+RUN echo "=== Building agent packages with tsc ===" && \
+    for pkg in base accessibility api explorer performance security ui-functional; do \
+      dir="packages/agents/$pkg"; \
+      if [ -f "$dir/tsconfig.json" ]; then \
+        echo "  Building $pkg..." && \
+        (cd "$dir" && npx tsc -p tsconfig.json 2>&1 || echo "  WARN: $pkg tsc had errors (output may still be emitted)"); \
+      fi; \
+    done && \
+    echo "=== Agent package builds complete ===" && \
+    echo "=== Verifying agent dist/ output ===" && \
+    for pkg in base accessibility api explorer performance security ui-functional; do \
+      if [ -f "packages/agents/$pkg/dist/index.js" ]; then \
+        echo "  OK: $pkg/dist/index.js exists"; \
+      else \
+        echo "  MISSING: $pkg/dist/index.js — this agent will use stub fallback"; \
+      fi; \
+    done
 
 # Coordinator (critical) and worker (tsc emits output even with type warnings)
 RUN pnpm --filter @semkiest/coordinator build && \
