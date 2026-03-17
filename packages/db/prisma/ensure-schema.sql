@@ -9,6 +9,10 @@ ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "url" TEXT;
 ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'ACTIVE';
 ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMP(3);
 
+-- Test results table: category + duration added by 20260317120000
+ALTER TABLE "test_results" ADD COLUMN IF NOT EXISTS "category" TEXT;
+ALTER TABLE "test_results" ADD COLUMN IF NOT EXISTS "duration" INTEGER;
+
 -- Users table: auth fields added by 20260315120000_add_user_auth_fields
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "name" TEXT;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "bio" TEXT;

@@ -41,10 +41,48 @@ jobs:
           echo "image-tag=${SHA::8}" >> $GITHUB_OUTPUT
           echo "Using image tag: ${SHA::8}"
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # Run database migrations before deploying new application code
+  # ─────────────────────────────────────────────────────────────────────────
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: check-build
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run database migrations via ECS one-off task
+        run: |
+          chmod +x scripts/migrate.sh
+          ./scripts/migrate.sh
+        env:
+          ENVIRONMENT: staging
+          ECS_CLUSTER: ${{ env.ECS_CLUSTER }}
+          ECS_MIGRATION_TASK_DEFINITION: ${{ vars.ECS_MIGRATION_TASK_DEF_STAGING || 'semkiest-staging-api' }}
+          ECS_MIGRATION_SUBNET: ${{ secrets.ECS_MIGRATION_SUBNET_STAGING }}
+          ECS_MIGRATION_SECURITY_GROUP: ${{ secrets.ECS_MIGRATION_SG_STAGING }}
+          IMAGE_TAG: ${{ needs.check-build.outputs.image-tag }}
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          MIGRATION_TIMEOUT: '180'
+
   deploy:
     name: Deploy ${{ matrix.service.name }} to Staging
     runs-on: ubuntu-latest
-    needs: check-build
+    needs:
+      - check-build
+      - migrate
 
     permissions:
       id-token: write
