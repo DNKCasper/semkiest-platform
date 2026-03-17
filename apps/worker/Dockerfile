@@ -91,6 +91,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV NODE_ENV=production
 
+# Enable pnpm in the runner stage (needed for playwright install via pnpm exec)
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 --ingroup nodejs semkiest
 
@@ -99,10 +102,13 @@ COPY --from=builder --chown=semkiest:nodejs /app .
 
 # Install Playwright Chromium browser (as the app user)
 # Only Chromium is needed — Firefox and WebKit are not used by default
+# Use "pnpm exec" instead of "npx" because pnpm workspaces don't expose
+# binaries via the npx lookup path — pnpm exec resolves them correctly.
 USER semkiest
 RUN echo "=== Installing Playwright Chromium ===" && \
-    npx playwright install chromium && \
-    echo "=== Playwright Chromium installed ==="
+    (cd apps/worker && pnpm exec playwright install chromium && \
+     echo "=== Playwright Chromium installed ===") || \
+    echo "WARN: Playwright Chromium install failed — agents requiring a browser will fall back to stubs"
 
 ARG BUILD_DATE
 ARG GIT_SHA
