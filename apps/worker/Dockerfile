@@ -26,21 +26,30 @@ RUN pnpm install --no-frozen-lockfile
 
 # Generate Prisma clients (dummy URL - generate only reads schema, no DB connection)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+# Build shared packages first (order matters for workspace dependencies)
 RUN cd packages/db && npx prisma generate && cd /app && \
-    cd packages/database && npx prisma generate && cd /app && \
-    pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
+    cd packages/database && npx prisma generate && cd /app
+
+# Shared packages (non-critical, some may not exist)
+RUN pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-types build 2>/dev/null || true && \
     pnpm --filter @semkiest/shared-utils build 2>/dev/null || true && \
-    pnpm --filter @semkiest/db build 2>/dev/null || true && \
-    pnpm --filter @semkiest/agent-base build 2>/dev/null || true && \
-    pnpm --filter @semkiest/accessibility-agent build 2>/dev/null || true && \
-    pnpm --filter @semkiest/performance build 2>/dev/null || true && \
-    pnpm --filter @semkiest/security-agent build 2>/dev/null || true && \
-    pnpm --filter @semkiest/api-agent build 2>/dev/null || true && \
-    pnpm --filter @semkiest/agent-ui-functional build 2>/dev/null || true && \
-    pnpm --filter @semkiest/explorer build 2>/dev/null || true && \
-    pnpm --filter @semkiest/coordinator build 2>/dev/null || true && \
-    pnpm --filter @semkiest/worker build || true
+    pnpm --filter @semkiest/db build 2>/dev/null || true
+
+# Agent packages — errors are logged (not suppressed) but non-blocking
+RUN echo "=== Building agent packages ===" && \
+    pnpm --filter @semkiest/agent-base build || echo "WARN: agent-base build failed" && \
+    pnpm --filter @semkiest/accessibility-agent build || echo "WARN: accessibility-agent build failed" && \
+    pnpm --filter @semkiest/performance build || echo "WARN: performance build failed" && \
+    pnpm --filter @semkiest/security-agent build || echo "WARN: security-agent build failed" && \
+    pnpm --filter @semkiest/api-agent build || echo "WARN: api-agent build failed" && \
+    pnpm --filter @semkiest/agent-ui-functional build || echo "WARN: agent-ui-functional build failed" && \
+    pnpm --filter @semkiest/explorer build || echo "WARN: explorer build failed" && \
+    echo "=== Agent package builds complete ==="
+
+# Coordinator and worker (critical)
+RUN pnpm --filter @semkiest/coordinator build && \
+    pnpm --filter @semkiest/worker build
 
 # -- Stage 2: Production runtime -------------------------------------------
 FROM node:20-slim AS runner
@@ -91,7 +100,9 @@ COPY --from=builder --chown=semkiest:nodejs /app .
 # Install Playwright Chromium browser (as the app user)
 # Only Chromium is needed — Firefox and WebKit are not used by default
 USER semkiest
-RUN npx playwright install chromium 2>/dev/null || true
+RUN echo "=== Installing Playwright Chromium ===" && \
+    npx playwright install chromium && \
+    echo "=== Playwright Chromium installed ==="
 
 ARG BUILD_DATE
 ARG GIT_SHA

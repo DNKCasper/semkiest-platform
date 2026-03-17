@@ -26,6 +26,15 @@
   "dependencies": {
     "zod": "^3.23.0"
   },
+  "optionalDependencies": {
+    "@semkiest/accessibility-agent": "workspace:*",
+    "@semkiest/performance": "workspace:*",
+    "@semkiest/security-agent": "workspace:*",
+    "@semkiest/api-agent": "workspace:*",
+    "@semkiest/agent-ui-functional": "workspace:*",
+    "@semkiest/explorer": "workspace:*",
+    "playwright": "^1.44.0"
+  },
   "devDependencies": {
     "typescript": "^5.4.0",
     "@types/node": "^20.0.0",
