@@ -35,7 +35,7 @@
     "zod": "^3.23.0",
     "@semkiest/slack-integration": "workspace:*",
     "helmet": "^7.1.0",
-    "@sentry/node": "^8.0.0",
+    "@sentry/node": "^10.43.0",
     "@semkiest/jira-integration": "workspace:*",
     "fastify": "^4.28.0",
     "@slack/web-api": "^7.0.0",
