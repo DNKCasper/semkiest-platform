@@ -367,10 +367,11 @@ export class RealAgentExecutor implements AgentExecutor {
         },
       };
     } catch (importErr) {
-      console.warn(
+      console.error(
         `[RealAgentExecutor] Could not load @semkiest/accessibility-agent: ${
           importErr instanceof Error ? importErr.message : String(importErr)
         }. Using stub.`,
+        importErr instanceof Error ? importErr.stack : '',
       );
       return this.stubAgentResult('accessibility', agentId, config, context, startTime);
     }
@@ -515,10 +516,11 @@ export class RealAgentExecutor implements AgentExecutor {
         },
       };
     } catch (importErr) {
-      console.warn(
+      console.error(
         `[RealAgentExecutor] Could not load @semkiest/performance: ${
           importErr instanceof Error ? importErr.message : String(importErr)
         }. Using stub.`,
+        importErr instanceof Error ? importErr.stack : '',
       );
       return this.stubAgentResult('performance', agentId, config, context, startTime);
     }
@@ -627,10 +629,11 @@ export class RealAgentExecutor implements AgentExecutor {
         },
       };
     } catch (importErr) {
-      console.warn(
+      console.error(
         `[RealAgentExecutor] Could not load @semkiest/security-agent: ${
           importErr instanceof Error ? importErr.message : String(importErr)
         }. Using stub.`,
+        importErr instanceof Error ? importErr.stack : '',
       );
       return this.stubAgentResult('security', agentId, config, context, startTime);
     }
@@ -740,10 +743,11 @@ export class RealAgentExecutor implements AgentExecutor {
         },
       };
     } catch (importErr) {
-      console.warn(
+      console.error(
         `[RealAgentExecutor] Could not load @semkiest/api-agent: ${
           importErr instanceof Error ? importErr.message : String(importErr)
         }. Using stub.`,
+        importErr instanceof Error ? importErr.stack : '',
       );
       return this.stubAgentResult('api', agentId, config, context, startTime);
     }
@@ -835,10 +839,11 @@ export class RealAgentExecutor implements AgentExecutor {
         },
       };
     } catch (importErr) {
-      console.warn(
+      console.error(
         `[RealAgentExecutor] Could not load @semkiest/agent-ui-functional: ${
           importErr instanceof Error ? importErr.message : String(importErr)
         }. Using stub.`,
+        importErr instanceof Error ? importErr.stack : '',
       );
       return this.stubAgentResult('ui-functional', agentId, config, context, startTime);
     }
@@ -962,10 +967,11 @@ export class RealAgentExecutor implements AgentExecutor {
         },
       };
     } catch (importErr) {
-      console.warn(
+      console.error(
         `[RealAgentExecutor] Could not load @semkiest/explorer or Playwright: ${
           importErr instanceof Error ? importErr.message : String(importErr)
         }. Using stub.`,
+        importErr instanceof Error ? importErr.stack : '',
       );
       return this.stubAgentResult('explorer', agentId, config, context, startTime);
     } finally {
