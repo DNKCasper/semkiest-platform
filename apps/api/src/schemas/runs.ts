@@ -12,6 +12,8 @@ export const RunIdParamsSchema = z.object({
 export const TriggerTestRunBodySchema = z.object({
   profileId: z.string().min(1),
   triggerType: z.enum(['manual', 'ci', 'scheduled']).default('manual'),
+  /** Optional override of which agent types to run. */
+  agents: z.array(z.string()).optional(),
 });
 
 export const ListRunsQuerySchema = z.object({

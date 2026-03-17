@@ -46,6 +46,14 @@ export interface SelfHealingEvent {
   timestamp: string;
 }
 
+/** A test step displayed in the result card's expanded view. */
+export interface TestStepDetail {
+  action: string;
+  expected?: string;
+  actual?: string;
+  status: 'passed' | 'failed' | 'skipped' | 'pending';
+}
+
 /** Rich test result used by ResultCard in the run-detail UI. */
 export interface TestResult {
   id: string;
@@ -58,6 +66,8 @@ export interface TestResult {
   evidence?: Evidence[];
   selfHealingEvent?: SelfHealingEvent;
   category?: string;
+  /** Detailed test steps for the expandable view. */
+  steps?: TestStepDetail[];
 }
 
 /** Aggregated stats for a category section. */
@@ -176,6 +186,8 @@ export interface TestProfile {
 /** Input for triggering a new test run */
 export interface TriggerRunInput {
   profileId: string;
+  /** Optional override of which agent types to run (derived from category toggles). */
+  agents?: string[];
 }
 
 /** Test result within a run (legacy, used by TestRunDetail) */

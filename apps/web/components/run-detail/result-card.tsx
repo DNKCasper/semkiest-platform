@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
-import type { TestResult, TestStatus, TestSeverity, Evidence } from '../../types/run';
+import type { TestResult, TestStatus, TestSeverity, Evidence, TestStepDetail } from '../../types/run';
 
 /** Formats milliseconds as a compact duration label. */
 function formatDuration(ms: number): string {
@@ -99,7 +99,8 @@ interface ResultCardProps {
  */
 export function ResultCard({ result, onEvidenceOpen }: ResultCardProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
-  const hasDetails = !!(result.error ?? result.selfHealingEvent ?? (result.evidence && result.evidence.length > 0));
+  const hasSteps = !!(result.steps && result.steps.length > 0);
+  const hasDetails = !!(result.error ?? result.selfHealingEvent ?? (result.evidence && result.evidence.length > 0) ?? hasSteps);
 
   return (
     <div
@@ -109,7 +110,15 @@ export function ResultCard({ result, onEvidenceOpen }: ResultCardProps) {
       )}
     >
       {/* Main row */}
-      <div className="flex items-start gap-3 p-4">
+      <button
+        type="button"
+        onClick={() => hasDetails && setIsExpanded((v) => !v)}
+        className={cn(
+          'flex items-start gap-3 p-4 w-full text-left',
+          hasDetails && 'cursor-pointer',
+        )}
+        aria-expanded={hasDetails ? isExpanded : undefined}
+      >
         <div className="mt-0.5">{STATUS_ICON[result.status]}</div>
 
         <div className="flex-1 min-w-0">
@@ -135,22 +144,19 @@ export function ResultCard({ result, onEvidenceOpen }: ResultCardProps) {
             {formatDuration(result.duration)}
           </span>
           {hasDetails && (
-            <button
-              type="button"
-              onClick={() => setIsExpanded((v) => !v)}
+            <span
               className="rounded-sm p-0.5 hover:bg-muted transition-colors"
-              aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
-              aria-expanded={isExpanded}
+              aria-hidden
             >
               {isExpanded ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
               ) : (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               )}
-            </button>
+            </span>
           )}
         </div>
-      </div>
+      </button>
 
       {/* Expandable details */}
       {isExpanded && hasDetails && (
@@ -162,6 +168,52 @@ export function ResultCard({ result, onEvidenceOpen }: ResultCardProps) {
               <pre className="text-xs text-red-600 whitespace-pre-wrap break-words font-mono">
                 {result.error}
               </pre>
+            </div>
+          )}
+
+          {/* Test steps detail */}
+          {hasSteps && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Test Steps</p>
+              <div className="rounded-md border bg-background overflow-hidden">
+                {result.steps!.map((step, idx) => {
+                  const stepStatusIcon =
+                    step.status === 'passed' ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" /> :
+                    step.status === 'failed' ? <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" /> :
+                    step.status === 'skipped' ? <MinusCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> :
+                    <MinusCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+                  return (
+                    <div
+                      key={idx}
+                      className={cn(
+                        'flex items-start gap-2.5 px-3 py-2.5 text-xs',
+                        idx > 0 && 'border-t',
+                        step.status === 'failed' && 'bg-red-50/50',
+                      )}
+                    >
+                      <span className="mt-0.5 shrink-0 flex items-center gap-1.5">
+                        <span className="text-muted-foreground font-mono w-4 text-right">{idx + 1}.</span>
+                        {stepStatusIcon}
+                      </span>
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <p className="font-medium text-foreground">{step.action}</p>
+                        {step.expected && (
+                          <p className="text-muted-foreground">
+                            <span className="font-medium">Expected:</span> {step.expected}
+                          </p>
+                        )}
+                        {step.actual && (
+                          <p className={cn(
+                            step.status === 'failed' ? 'text-red-600' : 'text-muted-foreground',
+                          )}>
+                            <span className="font-medium">Actual:</span> {step.actual}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

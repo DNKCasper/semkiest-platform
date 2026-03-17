@@ -125,7 +125,7 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { projectId } = paramsResult.data;
-      const { profileId } = bodyResult.data;
+      const { profileId, agents } = bodyResult.data;
       const { orgId } = request.user;
 
       try {
@@ -180,6 +180,7 @@ export const runRoutes: FastifyPluginAsync = async (fastify) => {
             },
             baseUrl: project.url ?? '',
             profileId,
+            ...(agents && agents.length > 0 ? { agents } : {}),
           });
 
           fastify.log.info(

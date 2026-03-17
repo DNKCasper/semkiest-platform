@@ -56,6 +56,43 @@ const logger: Logger = {
 };
 
 // =============================================================================
+// Profile category → agent type mapping
+// =============================================================================
+
+/**
+ * Map from profile form category keys to coordinator AgentType values.
+ * The profile form saves categories as { ui: { enabled: true }, ... }.
+ * This maps those keys to the agent types the coordinator understands.
+ */
+const CATEGORY_TO_AGENTS: Record<string, AgentType[]> = {
+  ui:            ['explorer', 'ui-functional'],
+  visual:        ['visual-regression'],
+  browser:       ['cross-browser'],
+  performance:   ['performance'],
+  load:          ['load'],
+  accessibility: ['accessibility'],
+  security:      ['security'],
+  api:           ['api'],
+};
+
+/**
+ * Derive enabled agents from the profile's category toggle format.
+ * Returns null if no categories are found (fallback to defaults).
+ */
+function deriveAgentsFromCategories(config: Record<string, unknown>): AgentType[] | null {
+  const agents: AgentType[] = [];
+
+  for (const [categoryKey, agentTypes] of Object.entries(CATEGORY_TO_AGENTS)) {
+    const catConfig = config[categoryKey] as Record<string, unknown> | undefined;
+    if (catConfig && catConfig.enabled === true) {
+      agents.push(...agentTypes);
+    }
+  }
+
+  return agents.length > 0 ? agents : null;
+}
+
+// =============================================================================
 // Job processor
 // =============================================================================
 
@@ -112,7 +149,8 @@ async function processCoordinateJob(
     // Parse enabled agents from profile config or payload
     const profileConfig = (profile.config ?? {}) as Record<string, unknown>;
     const enabledAgents: AgentType[] = (agents as AgentType[]) ??
-      (profileConfig.enabledAgents as AgentType[]) ?? [
+      (profileConfig.enabledAgents as AgentType[]) ??
+      deriveAgentsFromCategories(profileConfig) ?? [
         'explorer',
         'ui-functional',
       ];

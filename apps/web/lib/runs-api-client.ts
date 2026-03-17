@@ -7,6 +7,7 @@ import type {
   CategoryResults,
   TestCategory,
   RunSummary,
+  TestStepDetail,
 } from '../types/run';
 import type { ApiError } from '../types/project';
 import { getStoredTokens, isTokenExpired } from './auth-service';
@@ -74,7 +75,7 @@ function buildQueryString(params: RunQueryParams): string {
 // Data transformation helpers
 // ---------------------------------------------------------------------------
 
-/** Map Prisma result status → frontend display status */
+/** Map Prisma result status \u2192 frontend display status */
 function mapResultStatus(status: string): 'pass' | 'fail' | 'warning' | 'skip' {
   switch (status?.toUpperCase()) {
     case 'PASSED': return 'pass';
@@ -87,7 +88,7 @@ function mapResultStatus(status: string): 'pass' | 'fail' | 'warning' | 'skip' {
 
 /**
  * Parse a testName that may contain a "[category]" prefix.
- * e.g. "[ui] Homepage load verification" → { category: "ui", name: "Homepage load verification" }
+ * e.g. "[ui] Homepage load verification" \u2192 { category: "ui", name: "Homepage load verification" }
  */
 function parseTestName(testName: string): { category: TestCategory | null; name: string } {
   const match = testName.match(/^\[(\w+)\]\s*(.+)$/);
@@ -155,11 +156,19 @@ function buildCategories(testResults: any[]): CategoryResults[] {
     if (tr.errorMessage) {
       description = `Error: ${tr.errorMessage}`;
     } else if (actionSteps.length > 0) {
-      description = actionSteps.map((s: any) => s.action).join(' → ');
+      description = actionSteps.map((s: any) => s.action).join(' \u2192 ');
     }
 
     // Extract duration from metadata step or DB field
     const duration = tr.duration ?? extractDuration(steps) ?? 0;
+
+    // Build detailed step data for the expandable view
+    const detailedSteps: TestStepDetail[] = actionSteps.map((s: any) => ({
+      action: s.action as string,
+      expected: s.expected as string | undefined,
+      actual: s.actual as string | undefined,
+      status: (s.status?.toLowerCase() ?? 'pending') as TestStepDetail['status'],
+    }));
 
     group.results.push({
       id: tr.id,
@@ -170,6 +179,7 @@ function buildCategories(testResults: any[]): CategoryResults[] {
       error: tr.errorMessage ?? undefined,
       category: cat,
       duration,
+      steps: detailedSteps.length > 0 ? detailedSteps : undefined,
     });
 
     group.stats.total += 1;
@@ -190,7 +200,7 @@ function buildSummary(raw: any): RunSummary {
   const testResults = raw.testResults as any[] | undefined;
   let totalDuration = raw.duration ?? 0;
   if (totalDuration > 0) {
-    // Convert seconds → milliseconds
+    // Convert seconds \u2192 milliseconds
     totalDuration = totalDuration * 1000;
   } else if (testResults && testResults.length > 0) {
     // Sum individual test durations (from DB column or metadata step)
@@ -222,7 +232,7 @@ function normalizeRun(raw: any): TestRun {
 
   return {
     ...raw,
-    // Prisma returns UPPER_CASE status – frontend uses lower case
+    // Prisma returns UPPER_CASE status \u2013 frontend uses lower case
     status: typeof raw.status === 'string' ? raw.status.toLowerCase() : raw.status,
     // API returns passRate as 0-100 integer; frontend expects 0-1 ratio
     passRate:
@@ -236,9 +246,9 @@ function normalizeRun(raw: any): TestRun {
     skippedTests,
     completedTests: passedTests + failedTests + skippedTests,
     duration: raw.duration ?? 0,
-    // triggerType may be absent from the DB – default to 'manual'
+    // triggerType may be absent from the DB \u2013 default to 'manual'
     triggerType: raw.triggerType?.toLowerCase() ?? 'manual',
-    // startedAt may be null – fall back to createdAt
+    // startedAt may be null \u2013 fall back to createdAt
     startedAt,
     // triggeredAt is an alias used by the run-detail page
     triggeredAt: startedAt,
@@ -287,7 +297,7 @@ export const runsApi = {
     const raw = await request<any>(
       `/api/projects/${projectId}/runs/trend`,
     );
-    // Normalise passRate from 0-100 → 0-1
+    // Normalise passRate from 0-100 \u2192 0-1
     const data = (raw.data ?? []).map((point: any) => ({
       ...point,
       passRate:
@@ -298,7 +308,7 @@ export const runsApi = {
     return { data };
   },
 
-  /** POST /api/projects/:projectId/runs — trigger a new test run */
+  /** POST /api/projects/:projectId/runs \u2014 trigger a new test run */
   async trigger(projectId: string, input: TriggerRunInput): Promise<TestRun> {
     const raw = await request<any>(`/api/projects/${projectId}/runs`, {
       method: 'POST',

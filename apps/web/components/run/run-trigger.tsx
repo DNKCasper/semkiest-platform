@@ -1,7 +1,19 @@
 'use client';
 
 import * as React from 'react';
-import { Play, ChevronDown, Info, Loader2, AlertCircle } from 'lucide-react';
+import {
+  Play,
+  ChevronDown,
+  Info,
+  Loader2,
+  AlertCircle,
+  Monitor,
+  Eye,
+  Zap,
+  Accessibility,
+  Shield,
+  Globe,
+} from 'lucide-react';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Badge } from '../ui/badge';
@@ -10,6 +22,75 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent } from '../ui/card';
 import { cn } from '../../lib/utils';
 import type { TestProfile, TriggerRunInput } from '../../types/run';
+
+// ---------------------------------------------------------------------------
+// Test category configuration
+// ---------------------------------------------------------------------------
+
+interface CategoryOption {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+}
+
+const TEST_CATEGORIES: CategoryOption[] = [
+  { key: 'ui', label: 'UI Functional', icon: <Monitor className="h-4 w-4" />, description: 'Page loads, navigation, form interactions' },
+  { key: 'visual', label: 'Visual Regression', icon: <Eye className="h-4 w-4" />, description: 'Screenshot comparison and layout checks' },
+  { key: 'performance', label: 'Performance', icon: <Zap className="h-4 w-4" />, description: 'Core Web Vitals, load times, resources' },
+  { key: 'accessibility', label: 'Accessibility', icon: <Accessibility className="h-4 w-4" />, description: 'WCAG compliance, ARIA, keyboard nav' },
+  { key: 'security', label: 'Security', icon: <Shield className="h-4 w-4" />, description: 'Headers, TLS, vulnerability scanning' },
+  { key: 'api', label: 'API / Backend', icon: <Globe className="h-4 w-4" />, description: 'Endpoint contracts and error handling' },
+];
+
+/**
+ * Map from UI category keys to the agent types sent to the coordinator.
+ * Must stay in sync with CATEGORY_TO_AGENTS in coordinate.worker.ts.
+ */
+const CATEGORY_TO_AGENTS: Record<string, string[]> = {
+  ui:            ['explorer', 'ui-functional'],
+  visual:        ['visual-regression'],
+  performance:   ['performance'],
+  accessibility: ['accessibility'],
+  security:      ['security'],
+  api:           ['api'],
+};
+
+/** Derive initially enabled categories from a profile's settings/categories. */
+function getProfileCategories(profile: TestProfile): Set<string> {
+  const enabled = new Set<string>();
+
+  // If profile.categories has values, use those
+  if (profile.categories && profile.categories.length > 0) {
+    for (const cat of profile.categories) {
+      const lower = cat.toLowerCase().replace(/\s+/g, '');
+      // Normalise common category names
+      if (lower.includes('ui') || lower.includes('functional')) enabled.add('ui');
+      else if (lower.includes('visual') || lower.includes('appearance')) enabled.add('visual');
+      else if (lower.includes('performance') || lower.includes('load')) enabled.add('performance');
+      else if (lower.includes('accessibility') || lower.includes('a11y')) enabled.add('accessibility');
+      else if (lower.includes('security')) enabled.add('security');
+      else if (lower.includes('api') || lower.includes('backend')) enabled.add('api');
+    }
+  }
+
+  // Also check profile.settings for { ui: { enabled: true } } format
+  if (profile.settings) {
+    for (const key of Object.keys(CATEGORY_TO_AGENTS)) {
+      const val = profile.settings[key] as Record<string, unknown> | undefined;
+      if (val && val.enabled === true) {
+        enabled.add(key);
+      }
+    }
+  }
+
+  // Default to UI if nothing is enabled
+  if (enabled.size === 0) {
+    enabled.add('ui');
+  }
+
+  return enabled;
+}
 
 // ---------------------------------------------------------------------------
 // Profile detail card shown in the confirmation step
@@ -39,20 +120,6 @@ function ProfileDetail({ profile }: { profile: TestProfile }) {
           </div>
         )}
 
-        {Object.keys(profile.settings).length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">Settings</p>
-            <div className="rounded-md bg-muted p-2 text-xs font-mono space-y-0.5">
-              {Object.entries(profile.settings).map(([k, v]) => (
-                <div key={k} className="flex gap-2">
-                  <span className="text-muted-foreground">{k}:</span>
-                  <span>{String(v)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {profile.isDefault && (
           <Badge variant="outline" className="text-xs">
             Default profile
@@ -60,6 +127,64 @@ function ProfileDetail({ profile }: { profile: TestProfile }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test type toggle grid
+// ---------------------------------------------------------------------------
+
+interface TestTypeSelectorProps {
+  enabledCategories: Set<string>;
+  onToggle: (key: string) => void;
+}
+
+function TestTypeSelector({ enabledCategories, onToggle }: TestTypeSelectorProps) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-2">
+        Test Types to Run
+      </p>
+      <p className="text-xs text-muted-foreground mb-3">
+        Toggle the test categories for this run. These are pre-configured from your profile but can be adjusted per run.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {TEST_CATEGORIES.map((cat) => {
+          const isEnabled = enabledCategories.has(cat.key);
+          return (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => onToggle(cat.key)}
+              className={cn(
+                'flex items-start gap-2.5 rounded-lg border p-3 text-left transition-all',
+                isEnabled
+                  ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                  : 'border-muted hover:border-muted-foreground/30 opacity-60',
+              )}
+            >
+              <span className={cn(
+                'mt-0.5 shrink-0',
+                isEnabled ? 'text-primary' : 'text-muted-foreground',
+              )}>
+                {cat.icon}
+              </span>
+              <div className="min-w-0">
+                <p className={cn(
+                  'text-xs font-medium',
+                  isEnabled ? 'text-foreground' : 'text-muted-foreground',
+                )}>
+                  {cat.label}
+                </p>
+                <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                  {cat.description}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -73,6 +198,8 @@ interface ConfirmDialogProps {
   projectName?: string;
   isSubmitting: boolean;
   error: string | null;
+  enabledCategories: Set<string>;
+  onToggleCategory: (key: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -83,12 +210,16 @@ function ConfirmDialog({
   projectName,
   isSubmitting,
   error,
+  enabledCategories,
+  onToggleCategory,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const enabledCount = enabledCategories.size;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Start Test Run</DialogTitle>
         </DialogHeader>
@@ -101,10 +232,22 @@ function ConfirmDialog({
                 {' '}for <span className="font-medium text-foreground">{projectName}</span>
               </>
             ) : null}
-            {' '}using the profile below. Confirm to proceed.
+            . Select which test types to include, then confirm.
           </p>
 
           {profile && <ProfileDetail profile={profile} />}
+
+          <TestTypeSelector
+            enabledCategories={enabledCategories}
+            onToggle={onToggleCategory}
+          />
+
+          {enabledCount === 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              Select at least one test type to start a run.
+            </div>
+          )}
 
           {error && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -117,13 +260,17 @@ function ConfirmDialog({
             <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={onConfirm} disabled={isSubmitting} className="gap-2">
+            <Button
+              onClick={onConfirm}
+              disabled={isSubmitting || enabledCount === 0}
+              className="gap-2"
+            >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Play className="h-4 w-4" />
               )}
-              Start Run
+              Start Run ({enabledCount} type{enabledCount !== 1 ? 's' : ''})
             </Button>
           </div>
         </div>
@@ -146,11 +293,11 @@ export interface RunTriggerProps {
 }
 
 /**
- * Run trigger UI: profile selection dropdown + confirmation dialog before starting.
+ * Run trigger UI: profile selection dropdown + test type toggles + confirmation dialog.
  *
  * - Shows all configured profiles in a dropdown
- * - Hovering / selecting a profile shows its details inline
- * - Confirmation dialog before actually starting the run
+ * - Profile selection shows details inline
+ * - Confirmation dialog lets the user adjust which test types to run
  * - Quick-run button uses the default / last-used profile
  */
 export function RunTrigger({
@@ -173,9 +320,39 @@ export function RunTrigger({
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [enabledCategories, setEnabledCategories] = React.useState<Set<string>>(new Set(['ui']));
 
   const selectedProfile =
     profiles.find((p) => p.id === selectedProfileId) ?? null;
+
+  // When profile changes, reset categories from profile config
+  React.useEffect(() => {
+    if (selectedProfile) {
+      setEnabledCategories(getProfileCategories(selectedProfile));
+    }
+  }, [selectedProfile]);
+
+  const handleToggleCategory = React.useCallback((key: string) => {
+    setEnabledCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  /** Build the agents array from enabled categories. */
+  const buildAgentsList = React.useCallback((): string[] => {
+    const agents: string[] = [];
+    for (const cat of enabledCategories) {
+      const mapped = CATEGORY_TO_AGENTS[cat];
+      if (mapped) agents.push(...mapped);
+    }
+    return agents;
+  }, [enabledCategories]);
 
   const handleOpenConfirm = () => {
     if (!selectedProfileId) return;
@@ -184,11 +361,11 @@ export function RunTrigger({
   };
 
   const handleConfirm = async () => {
-    if (!selectedProfileId) return;
+    if (!selectedProfileId || enabledCategories.size === 0) return;
     setIsSubmitting(true);
     setError(null);
     try {
-      await onTrigger({ profileId: selectedProfileId });
+      await onTrigger({ profileId: selectedProfileId, agents: buildAgentsList() });
       setShowConfirm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start run');
@@ -203,7 +380,13 @@ export function RunTrigger({
     setError(null);
     setIsSubmitting(true);
     try {
-      await onTrigger({ profileId: defaultProfile.id });
+      const cats = getProfileCategories(defaultProfile);
+      const agents: string[] = [];
+      for (const cat of cats) {
+        const mapped = CATEGORY_TO_AGENTS[cat];
+        if (mapped) agents.push(...mapped);
+      }
+      await onTrigger({ profileId: defaultProfile.id, agents });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start run');
     } finally {
@@ -225,7 +408,7 @@ export function RunTrigger({
             <SelectValue
               placeholder={
                 isLoadingProfiles
-                  ? 'Loading profiles…'
+                  ? 'Loading profiles\u2026'
                   : profiles.length === 0
                     ? 'No profiles configured'
                     : 'Select a profile'
@@ -301,13 +484,15 @@ export function RunTrigger({
         </div>
       )}
 
-      {/* Confirmation dialog */}
+      {/* Confirmation dialog with test type selection */}
       <ConfirmDialog
         open={showConfirm}
         profile={selectedProfile}
         projectName={projectName}
         isSubmitting={isSubmitting}
         error={error}
+        enabledCategories={enabledCategories}
+        onToggleCategory={handleToggleCategory}
         onConfirm={handleConfirm}
         onCancel={() => setShowConfirm(false)}
       />
