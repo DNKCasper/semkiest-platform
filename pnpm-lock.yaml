@@ -247,9 +247,30 @@ importers:
 
   apps/worker:
     dependencies:
+      '@semkiest/accessibility-agent':
+        specifier: workspace:*
+        version: link:../../packages/agents/accessibility
+      '@semkiest/agent-ui-functional':
+        specifier: workspace:*
+        version: link:../../packages/agents/ui-functional
+      '@semkiest/api-agent':
+        specifier: workspace:*
+        version: link:../../packages/agents/api
+      '@semkiest/coordinator':
+        specifier: workspace:*
+        version: link:../../packages/agents/coordinator
       '@semkiest/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@semkiest/explorer':
+        specifier: workspace:*
+        version: link:../../packages/agents/explorer
+      '@semkiest/performance':
+        specifier: workspace:*
+        version: link:../../packages/agents/performance
+      '@semkiest/security-agent':
+        specifier: workspace:*
+        version: link:../../packages/agents/security
       '@semkiest/shared-config':
         specifier: workspace:*
         version: link:../../packages/shared-config
@@ -268,6 +289,9 @@ importers:
       ioredis:
         specifier: ^5.3.0
         version: 5.10.0
+      playwright:
+        specifier: ^1.44.0
+        version: 1.58.2
     devDependencies:
       '@types/jest':
         specifier: ^29.5.0

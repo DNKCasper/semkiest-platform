@@ -7,7 +7,7 @@
     "turbo": "^2.3.3",
     "@commitlint/config-conventional": "^19.0.0"
   },
-  "description": "SemkiEst Platform — modern collaborative application",
+  "description": "SemkiEst Platform \u2014 modern collaborative application",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -31,7 +31,8 @@
     "dev": "turbo run dev",
     "clean": "turbo run clean",
     "build": "turbo run build",
-    "build:agents": "for pkg in base accessibility api explorer performance security ui-functional; do dir=\"packages/agents/$pkg\"; if [ -f \"$dir/tsconfig.json\" ]; then echo \"Building $pkg...\" && (cd \"$dir\" && npx tsc -p tsconfig.json 2>&1 || true); fi; done && echo 'Agent builds complete'"
+    "build:agents": "for pkg in base accessibility api explorer performance security ui-functional; do dir=\"packages/agents/$pkg\"; if [ -f \"$dir/tsconfig.json\" ]; then echo \"Building $pkg...\" && (cd \"$dir\" && npx tsc -p tsconfig.json 2>&1 || true); fi; done && echo 'Agent builds complete'",
+    "postinstall": "npm run build:agents 2>/dev/null || true"
   },
   "name": "semkiest-platform"
 }
