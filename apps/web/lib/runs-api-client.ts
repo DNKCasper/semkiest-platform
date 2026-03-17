@@ -103,7 +103,8 @@ function buildCategories(testResults: any[]): CategoryResults[] {
   const categoryMap = new Map<TestCategory, CategoryResults>();
 
   for (const tr of testResults) {
-    const cat = inferCategory(tr.testName ?? '');
+    // Prefer explicit category from DB, fall back to name-based inference
+    const cat: TestCategory = (tr.category as TestCategory) || inferCategory(tr.testName ?? '');
 
     if (!categoryMap.has(cat)) {
       categoryMap.set(cat, {
@@ -116,10 +117,19 @@ function buildCategories(testResults: any[]): CategoryResults[] {
     const group = categoryMap.get(cat)!;
     const displayStatus = mapResultStatus(tr.status);
 
+    // Build a human-readable description from test steps when available
+    const steps = tr.testSteps as any[] | undefined;
+    let description: string | undefined;
+    if (tr.errorMessage) {
+      description = `Error: ${tr.errorMessage}`;
+    } else if (steps && steps.length > 0) {
+      description = steps.map((s: any) => s.action).join(' → ');
+    }
+
     group.results.push({
       id: tr.id,
       name: tr.testName ?? 'Unnamed test',
-      description: tr.errorMessage ? `Error: ${tr.errorMessage}` : undefined,
+      description,
       status: displayStatus,
       severity: displayStatus === 'fail' ? 'high' : displayStatus === 'warning' ? 'medium' : 'info',
       error: tr.errorMessage ?? undefined,
@@ -139,13 +149,26 @@ function buildCategories(testResults: any[]): CategoryResults[] {
 
 /** Build a RunSummary from raw API data. */
 function buildSummary(raw: any): RunSummary {
+  // The API's computeRunStats returns `duration` in seconds (from timestamps).
+  // Individual test result durations are stored in milliseconds.
+  // The frontend UI (formatDuration) expects milliseconds.
+  const testResults = raw.testResults as any[] | undefined;
+  let totalDuration = raw.duration ?? 0;
+  if (totalDuration > 0) {
+    // Convert seconds → milliseconds
+    totalDuration = totalDuration * 1000;
+  } else if (testResults && testResults.length > 0) {
+    // Sum individual test durations (already in ms)
+    totalDuration = testResults.reduce((sum: number, tr: any) => sum + (tr.duration ?? 0), 0);
+  }
+
   return {
     total: raw.totalTests ?? 0,
     passed: raw.passedTests ?? 0,
     failed: raw.failedTests ?? 0,
     warnings: 0,
     skipped: raw.skippedTests ?? 0,
-    duration: raw.duration ?? 0,
+    duration: totalDuration,
   };
 }
 

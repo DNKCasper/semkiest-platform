@@ -166,6 +166,10 @@ model TestResult {
   testRun      TestRun          @relation(fields: [testRunId], references: [id], onDelete: Cascade)
   testName     String           @map("test_name")
   status       TestResultStatus @default(PENDING)
+  /// Test category (ui, visual, performance, accessibility, security, api).
+  category     String?          @map("category")
+  /// Duration of the test in milliseconds.
+  duration     Int?             @map("duration")
   errorMessage String?          @map("error_message")
   createdAt    DateTime         @default(now()) @map("created_at")
 

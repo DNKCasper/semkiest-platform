@@ -243,10 +243,28 @@ async function processCoordinateJob(
 // =============================================================================
 
 /**
+ * Sub-test shape returned by enhanced stub agents (and eventually real agents).
+ */
+interface SubTestResult {
+  name: string;
+  category: string;
+  status: 'pass' | 'fail' | 'warning' | 'skip';
+  durationMs: number;
+  error?: string;
+  steps: Array<{
+    action: string;
+    expected: string;
+    actual: string;
+  }>;
+}
+
+/**
  * Map each agent result from the coordinator into TestResult + TestStep rows.
  *
- * Each agent becomes a TestResult; the agent's evidence/data is recorded as
- * a single TestStep for now (expandable as agents return richer data).
+ * If the agent's data payload contains `subTests` (rich descriptive results),
+ * each sub-test becomes its own TestResult with detailed TestStep rows. This
+ * gives the UI meaningful, human-readable test outcomes. Otherwise, we fall
+ * back to one TestResult per agent.
  */
 async function persistResults(testRunId: string, result: CoordinatorResult): Promise<void> {
   for (const agentRun of result.agentResults) {
@@ -258,44 +276,92 @@ async function persistResults(testRunId: string, result: CoordinatorResult): Pro
       pending: 'PENDING',
       running: 'RUNNING',
     };
-    const testResultStatus = statusMap[agentRun.status] ?? 'ERROR';
+    const agentStatus = statusMap[agentRun.status] ?? 'ERROR';
 
-    const testResult = await prisma.testResult.create({
-      data: {
-        testRunId,
-        testName: `${agentRun.agentType} agent`,
-        status: testResultStatus as any,
-        errorMessage: agentRun.error?.message ?? null,
-      },
-    });
+    const agentData = agentRun.result?.data as Record<string, unknown> | undefined;
+    const subTests = agentData?.subTests as SubTestResult[] | undefined;
 
-    // Create a summary step for each agent
-    await prisma.testStep.create({
-      data: {
-        testResultId: testResult.id,
-        stepNumber: 1,
-        action: `Execute ${agentRun.agentType} agent`,
-        expected: 'Agent completes successfully',
-        actual: agentRun.result
-          ? `${agentRun.result.status} in ${agentRun.result.durationMs}ms`
-          : agentRun.error?.message ?? 'No result',
-        status: testResultStatus === 'PASSED' ? 'PASSED' : testResultStatus === 'SKIPPED' ? 'SKIPPED' : 'FAILED',
-      },
-    });
+    if (subTests && subTests.length > 0) {
+      // ── Rich results: one TestResult per sub-test ───────────────────────────
+      for (const subTest of subTests) {
+        const subStatus = subTest.status === 'pass' ? 'PASSED'
+          : subTest.status === 'fail' ? 'FAILED'
+          : subTest.status === 'warning' ? 'WARNING'
+          : 'SKIPPED';
 
-    // If the agent produced evidence files, record them in additional steps
-    if (agentRun.result?.evidence && agentRun.result.evidence.length > 0) {
-      for (let i = 0; i < agentRun.result.evidence.length; i++) {
-        await prisma.testStep.create({
+        const testResult = await prisma.testResult.create({
           data: {
-            testResultId: testResult.id,
-            stepNumber: i + 2,
-            action: 'Collect evidence',
-            expected: 'Evidence artifact captured',
-            actual: agentRun.result.evidence[i],
-            status: 'PASSED',
+            testRunId,
+            testName: subTest.name,
+            status: subStatus as any,
+            category: subTest.category,
+            duration: subTest.durationMs,
+            errorMessage: subTest.error ?? null,
           },
         });
+
+        // Create a TestStep for each step in the sub-test
+        for (let i = 0; i < subTest.steps.length; i++) {
+          const step = subTest.steps[i];
+          await prisma.testStep.create({
+            data: {
+              testResultId: testResult.id,
+              stepNumber: i + 1,
+              action: step.action,
+              expected: step.expected,
+              actual: step.actual,
+              status: subStatus === 'FAILED' && i === subTest.steps.length - 1
+                ? 'FAILED'
+                : 'PASSED',
+            },
+          });
+        }
+      }
+    } else {
+      // ── Fallback: one TestResult per agent (legacy/simple results) ─────────
+      const testResult = await prisma.testResult.create({
+        data: {
+          testRunId,
+          testName: `${agentRun.agentType} agent`,
+          status: agentStatus as any,
+          category: agentRun.agentType === 'visual-regression' ? 'visual'
+            : agentRun.agentType === 'accessibility' ? 'accessibility'
+            : agentRun.agentType === 'performance' || agentRun.agentType === 'load' ? 'performance'
+            : agentRun.agentType === 'security' ? 'security'
+            : agentRun.agentType === 'api' ? 'api'
+            : 'ui',
+          duration: agentRun.result?.durationMs ?? 0,
+          errorMessage: agentRun.error?.message ?? null,
+        },
+      });
+
+      await prisma.testStep.create({
+        data: {
+          testResultId: testResult.id,
+          stepNumber: 1,
+          action: `Execute ${agentRun.agentType} agent`,
+          expected: 'Agent completes successfully',
+          actual: agentRun.result
+            ? `${agentRun.result.status} in ${agentRun.result.durationMs}ms`
+            : agentRun.error?.message ?? 'No result',
+          status: agentStatus === 'PASSED' ? 'PASSED' : agentStatus === 'SKIPPED' ? 'SKIPPED' : 'FAILED',
+        },
+      });
+
+      // Evidence files
+      if (agentRun.result?.evidence && agentRun.result.evidence.length > 0) {
+        for (let i = 0; i < agentRun.result.evidence.length; i++) {
+          await prisma.testStep.create({
+            data: {
+              testResultId: testResult.id,
+              stepNumber: i + 2,
+              action: 'Collect evidence',
+              expected: 'Evidence artifact captured',
+              actual: agentRun.result.evidence[i],
+              status: 'PASSED',
+            },
+          });
+        }
       }
     }
   }

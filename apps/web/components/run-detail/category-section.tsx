@@ -151,7 +151,7 @@ interface CategorySectionProps {
  */
 export function CategorySection({ category, defaultExpanded }: CategorySectionProps) {
   const [isExpanded, setIsExpanded] = React.useState(
-    defaultExpanded ?? category.stats.failed > 0,
+    defaultExpanded ?? (category.stats.failed > 0 || category.stats.total > 0),
   );
 
   const [viewerState, setViewerState] = React.useState<{
