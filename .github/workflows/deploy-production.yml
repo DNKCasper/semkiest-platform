@@ -209,7 +209,7 @@ jobs:
 
     steps:
       - name: Create GitHub Deployment record
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const status = '${{ needs.deploy.result }}' === 'success' ? 'success' : 'failure';
