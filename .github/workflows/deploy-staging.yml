@@ -70,7 +70,7 @@ jobs:
 
       - name: Checkout repository
         if: steps.check-secrets.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure AWS credentials (OIDC)
         if: steps.check-secrets.outputs.skip != 'true'
