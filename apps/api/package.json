@@ -2,7 +2,7 @@
   "main": "./dist/server.js",
   "private": true,
   "devDependencies": {
-    "eslint": "^8.57.0",
+    "eslint": "^10.0.3",
     "ts-jest": "^29.1.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/uuid": "^9.0.0",
