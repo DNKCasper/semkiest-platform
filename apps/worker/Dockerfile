@@ -37,9 +37,6 @@ RUN pnpm --filter @semkiest/shared-config build 2>/dev/null || true && \
     pnpm --filter @semkiest/db build 2>/dev/null || true
 
 # Agent packages — compile with tsc directly to avoid tsup/rollup native binary issues.
-# tsup depends on rollup which needs platform-specific binaries (@rollup/rollup-linux-x64-gnu)
-# that may not resolve correctly in all build environments. tsc is always available and
-# produces the same dist/index.js output that loadModule() needs at runtime.
 RUN echo "=== Building agent packages with tsc ===" && \
     for pkg in base accessibility api explorer performance security ui-functional; do \
       dir="packages/agents/$pkg"; \
@@ -105,20 +102,27 @@ ENV NODE_ENV=production
 # Enable pnpm in the runner stage (needed for playwright install via pnpm exec)
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
+# Create app user with a REAL home directory (Playwright needs ~/.cache/ms-playwright/)
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 --ingroup nodejs semkiest
+    adduser --system --uid 1001 --ingroup nodejs --home /home/semkiest semkiest && \
+    mkdir -p /home/semkiest/.cache && \
+    chown -R semkiest:nodejs /home/semkiest
+
+# Set HOME explicitly so Playwright installs browsers to /home/semkiest/.cache/
+ENV HOME=/home/semkiest
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/semkiest/.cache/ms-playwright
 
 # Copy the full built workspace (preserves pnpm symlink structure)
 COPY --from=builder --chown=semkiest:nodejs /app .
 
 # Install Playwright Chromium browser (as the app user)
-# Only Chromium is needed — Firefox and WebKit are not used by default
-# Use "pnpm exec" instead of "npx" because pnpm workspaces don't expose
-# binaries via the npx lookup path — pnpm exec resolves them correctly.
 USER semkiest
 RUN echo "=== Installing Playwright Chromium ===" && \
+    echo "HOME=$HOME" && \
+    echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" && \
     (cd apps/worker && pnpm exec playwright install chromium && \
-     echo "=== Playwright Chromium installed ===") || \
+     echo "=== Playwright Chromium installed ===" && \
+     ls -la $PLAYWRIGHT_BROWSERS_PATH/ 2>/dev/null) || \
     echo "WARN: Playwright Chromium install failed — agents requiring a browser will fall back to stubs"
 
 ARG BUILD_DATE

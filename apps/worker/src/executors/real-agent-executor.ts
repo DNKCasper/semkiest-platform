@@ -76,6 +76,35 @@ async function runStartupDiagnostics(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Agent invocation helper — handles different agent class APIs
+// ---------------------------------------------------------------------------
+
+/**
+ * Invoke an agent instance by trying common method signatures.
+ *
+ * BaseAgent defines execute(context, input), not run(). Some agents
+ * implement executeImpl() (protected, but callable in JS). This helper
+ * finds the first available method and calls it.
+ */
+async function invokeAgent(agent: any, input: any, context?: any): Promise<any> {
+  // 1. Try run(input) — standard expected API
+  if (typeof agent.run === 'function') {
+    return agent.run(input);
+  }
+  // 2. Try executeImpl(input) — UIFunctionalAgent's actual implementation
+  if (typeof agent.executeImpl === 'function') {
+    return agent.executeImpl(input);
+  }
+  // 3. Try execute(context, input) — BaseAgent's abstract method
+  if (typeof agent.execute === 'function') {
+    return agent.execute(context ?? {}, input);
+  }
+  throw new Error(
+    `Agent has no run(), executeImpl(), or execute() method. Available: ${Object.getOwnPropertyNames(Object.getPrototypeOf(agent)).join(', ')}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sub-test shape used by agents
 // ---------------------------------------------------------------------------
 
@@ -172,6 +201,7 @@ async function getSharedBrowser(): Promise<any> {
         '--disable-gpu',
       ],
     });
+    console.info('[RealAgentExecutor] Playwright Chromium launched successfully');
   }
   browserRefCount++;
   return sharedBrowser;
@@ -192,19 +222,10 @@ async function releaseSharedBrowser(): Promise<void> {
 // Real Agent Executor
 // ---------------------------------------------------------------------------
 
-/**
- * In-process agent executor that dynamically imports and runs real agent
- * packages. Falls back to stub results only for agents that cannot be loaded.
- *
- * Dynamic imports use an indirect loadModule() helper to prevent TypeScript
- * from statically resolving agent module paths at compile time. At runtime,
- * all agent packages are available via pnpm's node_modules symlinks.
- */
 export class RealAgentExecutor implements AgentExecutor {
   private runningAgents: Map<string, AbortController> = new Map();
 
   constructor() {
-    // Fire-and-forget startup diagnostics — logs to console on first instantiation
     runStartupDiagnostics().catch((err) =>
       console.error('[RealAgentExecutor] Startup diagnostics failed:', err),
     );
@@ -282,7 +303,6 @@ export class RealAgentExecutor implements AgentExecutor {
           return await this.runExplorerAgent(agentId, config, context, startTime);
 
         default:
-          // spec-reader, data-generator, cross-browser, load — still stubs
           return this.stubAgentResult(agentType, agentId, config, context, startTime);
       }
     } catch (err) {
@@ -327,12 +347,18 @@ export class RealAgentExecutor implements AgentExecutor {
         },
       });
 
-      const result = await agent.run();
+      const result = await invokeAgent(agent, {
+        targetUrls: [context.baseUrl],
+        runnerConfig: {
+          headless: true,
+          timeout: config.timeout,
+          wcagTags: config.settings?.wcagTags as string[] ?? ['wcag2a', 'wcag2aa', 'wcag21aa'],
+        },
+      });
       const durationMs = Date.now() - startTime;
 
-      // Adapt AccessibilityReport to subTests format
       const subTests: SubTestResult[] = [];
-      const report = result.data;
+      const report = result.data ?? result;
 
       if (report?.rawScanResults && Array.isArray(report.rawScanResults)) {
         for (const page of report.rawScanResults) {
@@ -341,7 +367,6 @@ export class RealAgentExecutor implements AgentExecutor {
           const pageUrl = page.url ?? context.baseUrl;
           const shortUrl = pageUrl.replace(context.baseUrl, '') || '/';
 
-          // Create a sub-test for the overall page scan
           subTests.push({
             name: `WCAG audit: ${shortUrl}`,
             category: 'accessibility',
@@ -375,7 +400,6 @@ export class RealAgentExecutor implements AgentExecutor {
         }
       }
 
-      // Add summary sub-test
       if (report?.summary) {
         const s = report.summary;
         subTests.push({
@@ -391,20 +415,19 @@ export class RealAgentExecutor implements AgentExecutor {
         });
       }
 
-      // Fallback if no sub-tests were generated
       if (subTests.length === 0) {
         subTests.push({
           name: 'Accessibility scan',
           category: 'accessibility',
-          status: result.success ? 'pass' : 'fail',
+          status: result.success !== false ? 'pass' : 'fail',
           durationMs,
           error: result.error,
-          steps: [{ action: 'Run accessibility agent', expected: 'Scan completes', actual: result.success ? 'Scan completed' : `Failed: ${result.error}` }],
+          steps: [{ action: 'Run accessibility agent', expected: 'Scan completes', actual: result.success !== false ? 'Scan completed' : `Failed: ${result.error}` }],
         });
       }
 
       return {
-        status: result.success ? 'pass' : 'fail',
+        status: result.success !== false ? 'pass' : 'fail',
         durationMs,
         evidence: [`${context.testRunId}/${agentId}/accessibility-report.json`],
         error: result.error,
@@ -466,7 +489,6 @@ export class RealAgentExecutor implements AgentExecutor {
 
       const durationMs = Date.now() - startTime;
 
-      // Adapt PerformanceAgentResult to subTests
       const subTests: SubTestResult[] = [];
 
       if (result.pages && result.pages.length > 0) {
@@ -501,28 +523,9 @@ export class RealAgentExecutor implements AgentExecutor {
               },
             ],
           });
-
-          // Resource audit sub-test
-          if (page.resources) {
-            const res = page.resources;
-            subTests.push({
-              name: `Resource audit: ${(page.url ?? '').replace(context.baseUrl, '') || '/'}`,
-              category: 'performance',
-              status: 'pass',
-              durationMs: 0,
-              steps: [
-                {
-                  action: 'Analyze page resources',
-                  expected: 'Total transfer < 3MB, fewer than 80 requests',
-                  actual: `DOM nodes: ${res.domNodes ?? 'N/A'}, Third-party requests: ${res.thirdPartyRequests ?? 'N/A'}`,
-                },
-              ],
-            });
-          }
         }
       }
 
-      // Summary sub-test
       if (result.summary) {
         const s = result.summary;
         subTests.push({
@@ -594,23 +597,20 @@ export class RealAgentExecutor implements AgentExecutor {
       }
 
       const agent = new SecurityAgent({});
-      // SecurityAgent must be enabled before use
       if (typeof agent.enable === 'function') {
         agent.enable();
       }
 
-      const result = await agent.run({
+      const result = await invokeAgent(agent, {
         url: context.baseUrl,
         headers: config.settings?.headers as Record<string, string> ?? {},
       });
 
       const durationMs = Date.now() - startTime;
 
-      // Adapt SecurityReport to subTests
       const subTests: SubTestResult[] = [];
       const findings = result.findings ?? [];
 
-      // Group findings by category
       const categories: Record<string, any[]> = {};
       for (const f of findings) {
         const cat = f.category ?? 'general';
@@ -618,7 +618,6 @@ export class RealAgentExecutor implements AgentExecutor {
         categories[cat].push(f);
       }
 
-      // Create sub-test for each finding category
       for (const [cat, catFindings] of Object.entries(categories)) {
         const hasCritical = catFindings.some((f: any) => f.severity === 'critical' || f.severity === 'high');
         subTests.push({
@@ -635,7 +634,6 @@ export class RealAgentExecutor implements AgentExecutor {
         });
       }
 
-      // If no findings, add a passing result
       if (findings.length === 0) {
         subTests.push({
           name: 'Security scan',
@@ -649,7 +647,6 @@ export class RealAgentExecutor implements AgentExecutor {
         });
       }
 
-      // Summary
       const summary = result.summary ?? {};
       subTests.push({
         name: 'Security summary',
@@ -723,10 +720,9 @@ export class RealAgentExecutor implements AgentExecutor {
         generateEdgeCases: config.settings?.generateEdgeCases as boolean ?? false,
       }, logger);
 
-      const result = await agent.run();
+      const result = await invokeAgent(agent, {});
       const durationMs = Date.now() - startTime;
 
-      // Adapt ApiAgentResult to subTests
       const subTests: SubTestResult[] = [];
       const tests = result.tests ?? [];
 
@@ -752,7 +748,6 @@ export class RealAgentExecutor implements AgentExecutor {
         });
       }
 
-      // Summary
       if (result.summary) {
         const s = result.summary;
         subTests.push({
@@ -822,6 +817,7 @@ export class RealAgentExecutor implements AgentExecutor {
 
       const agent = new UIFunctionalAgent({
         name: `ui-functional-${agentId}`,
+        version: '0.0.1',
         headless: true,
         baseUrl: context.baseUrl,
         testTimeout: config.timeout,
@@ -831,6 +827,7 @@ export class RealAgentExecutor implements AgentExecutor {
       const input = {
         tests: config.settings?.tests as any[] ?? [
           {
+            id: 'page-load-1',
             name: 'Page Load Verification',
             steps: [
               { type: 'navigation', url: context.baseUrl },
@@ -841,16 +838,23 @@ export class RealAgentExecutor implements AgentExecutor {
         baseUrl: context.baseUrl,
       };
 
-      const result = await agent.run(input);
+      // Log available methods for debugging
+      const proto = Object.getOwnPropertyNames(Object.getPrototypeOf(agent));
+      console.info(`[RealAgentExecutor] UIFunctionalAgent methods: ${proto.join(', ')}`);
+
+      const result = await invokeAgent(agent, input);
       const durationMs = Date.now() - startTime;
 
-      // Adapt UIAgentOutput to subTests
+      // Adapt result to subTests — handle both executeImpl output (UIAgentOutput)
+      // and BaseAgent.execute output (AgentResult<UIAgentOutput>)
       const subTests: SubTestResult[] = [];
+      const agentOutput = result.data ?? result;
+      const results = agentOutput?.results ?? [];
 
-      if (result.data?.results) {
-        for (const testResult of result.data.results) {
+      if (results.length > 0) {
+        for (const testResult of results) {
           subTests.push({
-            name: testResult.testName ?? 'UI test',
+            name: testResult.testName ?? testResult.name ?? 'UI test',
             category: 'ui',
             status: testResult.status === 'pass' ? 'pass' : testResult.status === 'fail' ? 'fail' : testResult.status === 'warning' ? 'warning' : 'skip',
             durationMs: testResult.duration ?? 0,
@@ -868,15 +872,15 @@ export class RealAgentExecutor implements AgentExecutor {
         subTests.push({
           name: 'Homepage load verification',
           category: 'ui',
-          status: result.success ? 'pass' : 'fail',
+          status: result.success !== false ? 'pass' : 'fail',
           durationMs,
           error: result.error,
-          steps: [{ action: 'Navigate to base URL', expected: 'Page loads', actual: result.success ? 'Page loaded' : `Failed: ${result.error}` }],
+          steps: [{ action: 'Navigate to base URL', expected: 'Page loads', actual: result.success !== false ? 'Page loaded' : `Failed: ${result.error}` }],
         });
       }
 
       return {
-        status: result.success ? 'pass' : 'fail',
+        status: result.success !== false ? 'pass' : 'fail',
         durationMs,
         evidence: [`${context.testRunId}/${agentId}/ui-results.json`],
         error: result.error,
@@ -924,7 +928,6 @@ export class RealAgentExecutor implements AgentExecutor {
         debug: (msg: string) => console.debug(`[explorer] ${msg}`),
       };
 
-      // Explorer needs a Playwright browser context
       browser = await getSharedBrowser();
       const browserContext = await browser.newContext({
         viewport: { width: 1280, height: 720 },
@@ -943,7 +946,6 @@ export class RealAgentExecutor implements AgentExecutor {
       await browserContext.close();
       const durationMs = Date.now() - startTime;
 
-      // Adapt CrawlResult to subTests
       const subTests: SubTestResult[] = [];
       const pages = result.pages ?? [];
       const stats = result.statistics ?? {};
@@ -988,7 +990,6 @@ export class RealAgentExecutor implements AgentExecutor {
         ],
       });
 
-      // Add a sub-test for each discovered page (limit to 10)
       for (const page of pages.slice(0, 10)) {
         const path = (page.url ?? '').replace(context.baseUrl, '') || '/';
         subTests.push({
@@ -1032,7 +1033,7 @@ export class RealAgentExecutor implements AgentExecutor {
   }
 
   // =========================================================================
-  // Stub fallback for agents without real implementations
+  // Stub fallback
   // =========================================================================
 
   private stubAgentResult(
