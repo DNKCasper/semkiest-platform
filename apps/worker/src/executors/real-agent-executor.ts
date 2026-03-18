@@ -33,6 +33,49 @@ async function loadModule(name: string): Promise<any> {
 /* eslint-enable @typescript-eslint/no-implied-eval */
 
 // ---------------------------------------------------------------------------
+// Startup diagnostic — probe all agent packages on first instantiation
+// ---------------------------------------------------------------------------
+
+const AGENT_PACKAGES = [
+  { name: '@semkiest/explorer', exportName: 'SiteCrawler' },
+  { name: '@semkiest/agent-ui-functional', exportName: 'UIFunctionalAgent' },
+  { name: '@semkiest/accessibility-agent', exportName: 'AccessibilityAgent' },
+  { name: '@semkiest/performance', exportName: 'PerformanceAgent' },
+  { name: '@semkiest/security-agent', exportName: 'SecurityAgent' },
+  { name: '@semkiest/api-agent', exportName: 'ApiAgent' },
+  { name: 'playwright', exportName: 'chromium' },
+];
+
+let diagnosticsRun = false;
+
+async function runStartupDiagnostics(): Promise<void> {
+  if (diagnosticsRun) return;
+  diagnosticsRun = true;
+
+  console.info('[RealAgentExecutor] ════════════════════════════════════════');
+  console.info('[RealAgentExecutor] Agent package import diagnostics:');
+  console.info('[RealAgentExecutor] ════════════════════════════════════════');
+
+  for (const pkg of AGENT_PACKAGES) {
+    try {
+      const mod = await loadModule(pkg.name);
+      const hasExport = mod && (mod[pkg.exportName] || mod.default?.[pkg.exportName]);
+      if (hasExport) {
+        console.info(`[RealAgentExecutor]   ✓ ${pkg.name} — loaded, ${pkg.exportName} found`);
+      } else {
+        const availableExports = mod ? Object.keys(mod).slice(0, 10).join(', ') : 'none';
+        console.error(`[RealAgentExecutor]   ✗ ${pkg.name} — loaded but ${pkg.exportName} NOT found. Available: ${availableExports}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[RealAgentExecutor]   ✗ ${pkg.name} — IMPORT FAILED: ${msg}`);
+    }
+  }
+
+  console.info('[RealAgentExecutor] ════════════════════════════════════════');
+}
+
+// ---------------------------------------------------------------------------
 // Sub-test shape used by agents
 // ---------------------------------------------------------------------------
 
@@ -159,6 +202,13 @@ async function releaseSharedBrowser(): Promise<void> {
  */
 export class RealAgentExecutor implements AgentExecutor {
   private runningAgents: Map<string, AbortController> = new Map();
+
+  constructor() {
+    // Fire-and-forget startup diagnostics — logs to console on first instantiation
+    runStartupDiagnostics().catch((err) =>
+      console.error('[RealAgentExecutor] Startup diagnostics failed:', err),
+    );
+  }
 
   async execute(
     agentType: AgentType,
